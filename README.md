@@ -33,14 +33,103 @@ What I want next:
 
 If you know Ollama, LM Studio, or llama.cpp — ideas and PRs for a smooth “download & run” flow are very welcome.
 
-## Quick start
+## One-line install (like Cursor)
+
+After you publish the repo on GitHub, replace `YOUR_USERNAME` with your GitHub username.
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.ps1 | iex
+```
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.sh | bash
+```
+
+This will:
+
+1. Check Node.js 20+
+2. Run `npm install -g` from your GitHub repo (builds the `lunami` command)
+3. Create `~/.lunami/.env` from `.env.example` (API key or Ollama)
+4. You type **`lunami`** in a new terminal — done
+
+**Custom repo:**
+
+```powershell
+$env:LUNAMI_INSTALL_REPO = 'your-user/lunami-cli'
+irm https://raw.githubusercontent.com/your-user/lunami-cli/main/scripts/install.ps1 | iex
+```
+
+```bash
+LUNAMI_INSTALL_REPO=your-user/lunami-cli curl -fsSL https://raw.githubusercontent.com/your-user/lunami-cli/main/scripts/install.sh | bash
+```
+
+### Local model after install
+
+```bash
+# install Ollama from https://ollama.com
+ollama pull llama3.2
+```
+
+Edit `~/.lunami/.env`:
+
+```env
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Then run `lunami` — the agent uses your downloaded model, no cloud API.
+
+> **Coming soon:** `lunami models pull llama3.2` so you don't need Ollama separately.
+
+## Install the `lunami` command (manual)
+
+Type **`lunami`** in any terminal — same as `npm run dev`, but global.
+
+**From this repo (recommended while developing):**
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/lunami-cli.git
 cd lunami-cli
 npm install
 cp .env.example .env
-# edit .env — API key and model (or use Ollama, see below)
+# edit .env — API key and model (or Ollama, see below)
+npm run link:global
+```
+
+Then open a **new** terminal and run:
+
+```bash
+lunami
+```
+
+`npm run link:global` = `npm run build` + `npm link` (registers the `lunami` command on your PATH).
+
+**When published on npm:**
+
+```bash
+npm install -g lunami-cli
+lunami
+```
+
+**Without global install:**
+
+```bash
+npm run build
+npx lunami
+```
+
+> **Windows:** if `lunami` is not found, ensure `%AppData%\npm` is in your PATH (npm usually adds this). Restart the terminal after `npm link`.
+
+## Quick start (without linking)
+
+```bash
+npm install
+cp .env.example .env
 npm run dev
 ```
 

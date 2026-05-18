@@ -1,5 +1,6 @@
 import {config} from 'dotenv';
 import {readFile, writeFile} from 'node:fs/promises';
+import {homedir} from 'node:os';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {upsertEnvLine} from './utils.js';
@@ -10,6 +11,7 @@ import {OpenAIProvider} from './providers/openai.js';
 import type { BuiltinToolName } from './toolNames.js';
 
 config();
+config({path: resolve(homedir(), '.lunami', '.env'), override: false});
 
 /** Built-in LUNAMI tools (MCP tools use `mcp__<server>__<tool>` names). */
 export type LlmToolName = BuiltinToolName;

@@ -9,7 +9,8 @@ This project was started by a **14-year-old developer** with **AI-assisted** cod
 ```bash
 npm install
 cp .env.example .env
-npm run dev
+npm run link:global   # optional: `lunami` command globally
+lunami              # or: npm run dev
 ```
 
 Before opening a PR:
