@@ -2,55 +2,96 @@
 
 [![CI](https://github.com/YOUR_USERNAME/lunami-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/lunami-cli/actions/workflows/ci.yml)
 
-**LUNAMI** — agentic TUI для парного программирования с AI прямо в терминале: чтение и запись файлов, поиск по коду, git, scaffold проектов, MCP и headless-режим для CI.
+**LUNAMI** is an agentic terminal UI for AI pair programming: read and write files, search the codebase, git, project scaffolding, MCP tools, and a headless mode for scripts and CI.
 
-## Возможности
+> **About this project**  
+> Built by a **14-year-old developer** with help from **AI** (coding assistants). The goal is simple: a coding agent that lives in your terminal — like having a teammate you can talk to while you build stuff.  
+> It's early (`v0.1.0`), but it already works. Feedback and PRs are welcome.
 
-- **TUI** на [Ink](https://github.com/vadimdemedes/ink): чат, палитра `/`, справка `?`, 4 темы
-- **Режимы агента** (клавиша **Tab**): `PLAN` → `AUTO` → `YOLO`
-  - **PLAN** — только план, без инструментов
-  - **AUTO** — инструменты с подтверждением записи и опасных команд
-  - **YOLO** — инструменты без подтверждений (на свой риск)
-- **Лог активности** — «Думаю», «Прочитано N файлов», длительность шагов
-- **Инструменты**: `readFile`, `writeFile` (diff + approve), `search`, `tree`, `execCommand`, `generateProject`, git, MCP
-- **Контекст**: `@files` / `@folders`, `.lunami/rules.md`, `AGENTS.md`, `/context`
+## Features
+
+- **TUI** powered by [Ink](https://github.com/vadimdemedes/ink): chat, `/` command palette, `?` help, 4 themes
+- **Agent modes** (**Tab** to cycle): `PLAN` → `AUTO` → `YOLO`
+  - **PLAN** — planning only, no tools
+  - **AUTO** — tools with approval for writes and dangerous commands
+  - **YOLO** — tools with no confirmations (use at your own risk)
+- **Activity log** — “Thinking”, “Read N files”, step durations
+- **Tools**: `readFile`, `writeFile` (diff + approve), `search`, `tree`, `execCommand`, `generateProject`, git, MCP
+- **Context**: `@files` / `@folders`, `.lunami/rules.md`, `AGENTS.md`, `/context`
 - **Headless**: `--prompt`, stdin, `--json`, `--plan`, `--yolo`, `-y`
+- **i18n**: Russian and English UI (`/lang ru` | `/lang en`)
 
-## Быстрый старт
+## Roadmap: run a model through LUNAMI
+
+Today you can already point LUNAMI at a **local model via [Ollama](https://ollama.com)** (see below).
+
+What I want next:
+
+- **`lunami models pull <name>`** — download a model in one command
+- **`lunami run`** — start the agent with a bundled or local model, no cloud API key
+- A simple setup wizard in the TUI: pick provider → pick model → go
+
+If you know Ollama, LM Studio, or llama.cpp — ideas and PRs for a smooth “download & run” flow are very welcome.
+
+## Quick start
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/lunami-cli.git
 cd lunami-cli
 npm install
 cp .env.example .env
-# отредактируйте .env — API key и модель
+# edit .env — API key and model (or use Ollama, see below)
 npm run dev
 ```
 
-## Запуск
+## Run locally with Ollama (no cloud API)
 
-Интерактивный TUI:
+1. Install [Ollama](https://ollama.com) and pull a model:
+
+```bash
+ollama pull llama3.2
+```
+
+2. In `.env`:
+
+```env
+LLM_PROVIDER=ollama
+LLM_MODEL=llama3.2
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+3. Start LUNAMI:
 
 ```bash
 npm run dev
 ```
 
-Headless (без интерфейса):
+The agent runs against your machine — same TUI, same tools.
+
+## Usage
+
+Interactive TUI:
 
 ```bash
-npm run dev -- --prompt "Что делает этот код?"
+npm run dev
+```
+
+Headless:
+
+```bash
+npm run dev -- --prompt "What does this code do?"
 npm run dev -- --run task.md
-npm run dev -- --prompt "Рефакторинг auth" --plan
-npm run dev -- --prompt "Пофикси баг" --yolo
+npm run dev -- --prompt "Refactor auth layer" --plan
+npm run dev -- --prompt "Fix the bug" --yolo
 ```
 
-JSON для скриптов:
+JSON output:
 
 ```bash
-npm run dev -- --prompt "Напиши функцию" --json
+npm run dev -- --prompt "Write a function" --json
 ```
 
-Сборка и тесты:
+Build and test:
 
 ```bash
 npm run build
@@ -58,82 +99,83 @@ npm run typecheck
 npm test
 ```
 
-## Горячие клавиши
+## Keyboard shortcuts
 
-| Клавиша | Действие |
-|---------|----------|
-| **Tab** | PLAN → AUTO → YOLO |
-| **Enter** | отправить / развернуть длинный tool-вывод (пустое поле) |
-| **o** | развернуть/свернуть последний tool-вывод |
-| **?** | справка по командам |
-| **Ctrl+L** | очистить чат |
-| **Ctrl+C** | выход |
+| Key | Action |
+|-----|--------|
+| **Tab** | Cycle PLAN → AUTO → YOLO |
+| **Enter** | Send message / expand collapsed tool output (empty input) |
+| **o** | Expand/collapse last tool output |
+| **?** | Command help |
+| **Ctrl+L** | Clear chat |
+| **Ctrl+C** | Exit |
 
-## Команды в чате
+## Chat commands
 
-| Команда | Описание |
-|---------|----------|
-| `/plan` `/auto` `/yolo` | режим агента |
-| `/model` `/api` `/provider` | модель и API |
-| `/cd` | рабочая папка проекта |
-| `/context` | контекст проекта |
-| `/rules` | правила из `.lunami/rules.md` и `AGENTS.md` |
-| `/mcp` | статус MCP; `/mcp reload` |
-| `/session` | сессии |
-| `/theme` `/lang` | тема и язык |
-| `/approve` `/deny` | подтверждение опасных действий |
-| `/tree` `/clear` `/export` `/undo` | дерево, очистка, экспорт, откат записи |
+| Command | Description |
+|---------|-------------|
+| `/plan` `/auto` `/yolo` | Agent mode |
+| `/model` `/api` `/provider` | Model and API |
+| `/cd` | Project working directory |
+| `/context` | Project context |
+| `/rules` | Rules from `.lunami/rules.md` and `AGENTS.md` |
+| `/mcp` | MCP status; `/mcp reload` |
+| `/session` | Sessions |
+| `/theme` `/lang` | Theme and language |
+| `/approve` `/deny` | Approve dangerous actions |
+| `/tree` `/clear` `/export` `/undo` | Tree, clear, export, undo last write |
 
 ## MCP
 
-Скопируйте пример в workspace:
+Copy the example into your workspace:
 
 ```bash
 mkdir -p .lunami
 cp mcp.example.json .lunami/mcp.json
 ```
 
-Глобальный конфиг: `~/.lunami/mcp.json`. В TUI: `/mcp`, `/mcp reload`.
+Global config: `~/.lunami/mcp.json`. In the TUI: `/mcp`, `/mcp reload`.
 
-## Переменные окружения
+## Environment variables
 
-См. [`.env.example`](.env.example). Поддерживаются OpenAI-совместимые API, Anthropic, Ollama.
+See [`.env.example`](.env.example). Supports OpenAI-compatible APIs, Anthropic, and Ollama.
 
-| Переменная | Назначение |
-|------------|------------|
+| Variable | Purpose |
+|----------|---------|
 | `LLM_PROVIDER` | `openai` \| `anthropic` \| `ollama` |
-| `LLM_MODEL` | имя модели |
-| `OPENAI_API_KEY` | ключ (OpenAI / совместимые) |
-| `OPENAI_BASE_URL` | опционально, для прокси |
-| `LUNAMI_YES=1` | в AUTO пропускать подтверждение **записи** файлов (headless) |
+| `LLM_MODEL` | Model name |
+| `OPENAI_API_KEY` | Key for OpenAI / compatible APIs |
+| `OPENAI_BASE_URL` | Optional proxy or local gateway |
+| `OLLAMA_BASE_URL` | Ollama server (default `http://localhost:11434`) |
+| `LUNAMI_YES=1` | In AUTO, skip **file write** approval (headless) |
 
-**Не коммитьте `.env`** — он в `.gitignore`.
+Never commit `.env` — it is in `.gitignore`.
 
-## stdin и Windows
+## stdin and Windows
 
 ```bash
 cat task.txt | npm run dev
 ```
 
-> **PowerShell и кириллица в pipe:** перед `|` выполните  
+> **PowerShell + Cyrillic in pipes:** set  
 > `$OutputEncoding = [System.Text.Encoding]::UTF8`  
-> или используйте `npm run dev -- --run task.txt`.
+> before `|`, or use `npm run dev -- --run task.txt`.
 
-## Сессии и отладка
+## Sessions and debug
 
-- Сессии: `./.lunami/sessions/` в текущем проекте (`--session`)
-- Debug-лог: `~/.lunami/debug.log` (`--debug`)
+- Sessions: `./.lunami/sessions/` in the project (`--session`)
+- Debug log: `~/.lunami/debug.log` (`--debug`)
 
 ```bash
-npm run dev -- --prompt "пофикси баг" --verbose --quiet
+npm run dev -- --prompt "fix the bug" --verbose --quiet
 ```
 
 ## Safe modes (headless / CI)
 
-- `--plan` / `--dry-run` — только план, без инструментов
-- `--yolo` — инструменты без подтверждений
-- `-y` / `LUNAMI_YES=1` — auto-approve **записи** в режиме AUTO
+- `--plan` / `--dry-run` — plan only, no tools
+- `--yolo` — tools without confirmations
+- `-y` / `LUNAMI_YES=1` — auto-approve **writes** in AUTO mode
 
-## Лицензия
+## License
 
 [MIT](LICENSE)

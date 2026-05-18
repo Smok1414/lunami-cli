@@ -1,8 +1,10 @@
 # Contributing
 
-Спасибо за интерес к LUNAMI CLI.
+Thanks for checking out LUNAMI CLI.
 
-## Разработка
+This project was started by a **14-year-old developer** with **AI-assisted** coding. We're learning in public — constructive feedback, bug reports, and small PRs are especially appreciated.
+
+## Development setup
 
 ```bash
 npm install
@@ -10,7 +12,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Перед PR:
+Before opening a PR:
 
 ```bash
 npm run typecheck
@@ -18,14 +20,23 @@ npm run build
 npm test
 ```
 
-## Стиль
+## Guidelines
 
 - TypeScript, ESM (`"type": "module"`)
-- Сообщения UI — через `src/i18n.ts` (ru + en)
-- Не коммитьте `.env`, `node_modules/`, `.lunami/`
+- User-facing strings go through `src/i18n.ts` (English + Russian)
+- Do not commit `.env`, `node_modules/`, or `.lunami/`
+
+## Ideas we care about
+
+- Better **local model** UX (Ollama today; `lunami models pull` / `lunami run` tomorrow)
+- Safer defaults in **AUTO** vs **YOLO**
+- Terminal rendering fixes on Windows
+- Docs and examples for beginners
 
 ## Pull requests
 
-1. Опишите проблему или фичу
-2. Добавьте тесты для логики в `src/__tests__/` где уместно
-3. Убедитесь, что CI проходит
+1. Describe the problem or feature
+2. Add tests in `src/__tests__/` when you change logic
+3. Make sure CI passes
+
+Keep PRs focused — small changes are easier to review.
