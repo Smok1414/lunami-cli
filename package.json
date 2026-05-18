@@ -2,7 +2,16 @@
   "name": "lunami-cli",
   "version": "0.1.0",
   "description": "Agentic AI coding assistant TUI for your terminal",
+  "author": "Smok1414 (https://github.com/Smok1414)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Smok1414/lunami-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Smok1414/lunami-cli/issues"
+  },
+  "homepage": "https://github.com/Smok1414/lunami-cli#readme",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

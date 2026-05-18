@@ -2,7 +2,9 @@
 
 Thanks for checking out LUNAMI CLI.
 
-This project was started by a **14-year-old developer** with **AI-assisted** coding. We're learning in public — constructive feedback, bug reports, and small PRs are especially appreciated.
+Maintainer: [**Smok1414**](https://github.com/Smok1414) · repo: [lunami-cli](https://github.com/Smok1414/lunami-cli)
+
+This project was started by a 14-year-old developer with AI-assisted coding. Feedback, bug reports, and PRs are welcome.
 
 ## Development setup
 

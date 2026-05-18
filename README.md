@@ -1,12 +1,12 @@
 # LUNAMI CLI
 
-[![CI](https://github.com/YOUR_USERNAME/lunami-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/lunami-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/Smok1414/lunami-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Smok1414/lunami-cli/actions/workflows/ci.yml)
 
 **LUNAMI** is an agentic terminal UI for AI pair programming: read and write files, search the codebase, git, project scaffolding, MCP tools, and a headless mode for scripts and CI.
 
 > **About this project**  
-> Built by a **14-year-old developer** with help from **AI** (coding assistants). The goal is simple: a coding agent that lives in your terminal — like having a teammate you can talk to while you build stuff.  
-> It's early (`v0.1.0`), but it already works. Feedback and PRs are welcome.
+> Built by [**Smok1414**](https://github.com/Smok1414) — a 14-year-old developer — with help from AI. A coding agent in your terminal, like a teammate while you build.  
+> Early release (`v0.1.0`). Issues and PRs welcome on [GitHub](https://github.com/Smok1414/lunami-cli).
 
 ## Features
 
@@ -33,20 +33,18 @@ What I want next:
 
 If you know Ollama, LM Studio, or llama.cpp — ideas and PRs for a smooth “download & run” flow are very welcome.
 
-## One-line install (like Cursor)
-
-After you publish the repo on GitHub, replace `YOUR_USERNAME` with your GitHub username.
+## One-line install
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/Smok1414/lunami-cli/main/scripts/install.ps1 | iex
 ```
 
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Smok1414/lunami-cli/main/scripts/install.sh | bash
 ```
 
 This will:
@@ -55,17 +53,6 @@ This will:
 2. Run `npm install -g` from your GitHub repo (builds the `lunami` command)
 3. Create `~/.lunami/.env` from `.env.example` (API key or Ollama)
 4. You type **`lunami`** in a new terminal — done
-
-**Custom repo:**
-
-```powershell
-$env:LUNAMI_INSTALL_REPO = 'your-user/lunami-cli'
-irm https://raw.githubusercontent.com/your-user/lunami-cli/main/scripts/install.ps1 | iex
-```
-
-```bash
-LUNAMI_INSTALL_REPO=your-user/lunami-cli curl -fsSL https://raw.githubusercontent.com/your-user/lunami-cli/main/scripts/install.sh | bash
-```
 
 ### Local model after install
 
@@ -93,7 +80,7 @@ Type **`lunami`** in any terminal — same as `npm run dev`, but global.
 **From this repo (recommended while developing):**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/lunami-cli.git
+git clone https://github.com/Smok1414/lunami-cli.git
 cd lunami-cli
 npm install
 cp .env.example .env

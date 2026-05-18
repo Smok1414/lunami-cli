@@ -1,12 +1,12 @@
 # LUNAMI CLI — Windows installer (PowerShell)
 # Usage:
-#   irm https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Smok1414/lunami-cli/main/scripts/install.ps1 | iex
 # Custom repo:
-#   $env:LUNAMI_INSTALL_REPO = 'your-user/lunami-cli'; irm ... | iex
+#   $env:LUNAMI_INSTALL_REPO = 'Smok1414/lunami-cli'; irm ... | iex
 
 $ErrorActionPreference = 'Stop'
 
-$Repo = if ($env:LUNAMI_INSTALL_REPO) { $env:LUNAMI_INSTALL_REPO.Trim() } else { 'YOUR_USERNAME/lunami-cli' }
+$Repo = if ($env:LUNAMI_INSTALL_REPO) { $env:LUNAMI_INSTALL_REPO.Trim() } else { 'Smok1414/lunami-cli' }
 $Branch = if ($env:LUNAMI_INSTALL_BRANCH) { $env:LUNAMI_INSTALL_BRANCH.Trim() } else { 'main' }
 
 function Write-Step([string]$Message) {

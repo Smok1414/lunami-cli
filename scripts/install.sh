@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # LUNAMI CLI — install script (macOS / Linux)
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/lunami-cli/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Smok1414/lunami-cli/main/scripts/install.sh | bash
 # Custom repo:
-#   LUNAMI_INSTALL_REPO=your-user/lunami-cli curl -fsSL ... | bash
+#   LUNAMI_INSTALL_REPO=Smok1414/lunami-cli curl -fsSL ... | bash
 
 set -euo pipefail
 
-REPO="${LUNAMI_INSTALL_REPO:-YOUR_USERNAME/lunami-cli}"
+REPO="${LUNAMI_INSTALL_REPO:-Smok1414/lunami-cli}"
 BRANCH="${LUNAMI_INSTALL_BRANCH:-main}"
 
 step() { printf '\033[36m[lunami]\033[0m %s\n' "$1"; }

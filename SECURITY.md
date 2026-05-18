@@ -4,7 +4,7 @@
 
 Please **do not** open a public GitHub issue for security problems.
 
-Report privately via GitHub Security Advisories (once the repo is public) or contact the maintainer directly.
+Report privately via [GitHub Security Advisories](https://github.com/Smok1414/lunami-cli/security/advisories) or the [maintainer profile](https://github.com/Smok1414).
 
 ## Secrets and API keys
 
