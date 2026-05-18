@@ -200,6 +200,10 @@ const dictionary = {
     api_not_set: '(not set)',
     api_quick_select: '  Quick select:',
     api_manual: '(manual input)',
+    api_setup_title: 'Welcome — choose your API',
+    api_setup_intro: 'No API key found. Pick a provider to get started.',
+    api_setup_hint: 'Tip: choose Ollama for a free local model (install from ollama.com).',
+    api_setup_required: '◆ Set up an API first (↑↓ select, Enter confirm). Esc is disabled until configured.',
     
     // Command Palette & Input & App
     palette_cmd_one: '{0} command',
@@ -417,6 +421,10 @@ const dictionary = {
     api_not_set: '(не задан)',
     api_quick_select: '  Быстрый выбор:',
     api_manual: '(ввести вручную)',
+    api_setup_title: 'Добро пожаловать — выберите API',
+    api_setup_intro: 'API-ключ не найден. Выберите провайдера для начала работы.',
+    api_setup_hint: 'Совет: Ollama — бесплатная локальная модель (ollama.com).',
+    api_setup_required: '◆ Сначала настройте API (↑↓ выбор, Enter подтвердить). Esc недоступен.',
     
     // Command Palette & Input & App
     palette_cmd_one: '{0} команда',
@@ -502,14 +510,8 @@ export async function changeLang(lang: Language): Promise<void> {
   // Notify UI
   listeners.forEach(l => l());
 
-  const lunamiRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const envPath = resolve(lunamiRoot, '.env');
-  let content = '';
-  try {
-    content = await readFile(envPath, 'utf8');
-  } catch {
-    content = '';
-  }
+  const {readPrimaryEnvContent, writePrimaryEnvContent} = await import('./envConfig.js');
+  let content = await readPrimaryEnvContent();
   content = upsertEnvLine(content, 'LUNAMI_LANG', lang);
-  await writeFile(envPath, content, 'utf8');
+  await writePrimaryEnvContent(content);
 }

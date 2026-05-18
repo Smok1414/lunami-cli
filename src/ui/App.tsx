@@ -5,7 +5,15 @@ import type {ActivityStep} from '../activity.js';
 import {runAgent, type AgentEvent, type AgentStatus} from '../agent.js';
 import {getMcpManager} from '../mcp/manager.js';
 import {filterCommands} from '../commands.js';
-import {changeApi, pingApiConnection, changeModel, getCurrentBaseUrl, getModelLabel, getProviderInfo} from '../llm.js';
+import {
+  changeApi,
+  hasConfiguredApi,
+  pingApiConnection,
+  changeModel,
+  getCurrentBaseUrl,
+  getModelLabel,
+  getProviderInfo
+} from '../llm.js';
 import {
   changeCwd,
   clearPendingApproval,
@@ -82,7 +90,9 @@ export function App(): React.ReactElement {
   const [mpCustom, setMpCustom] = useState(false);
   const [mpCustomInput, setMpCustomInput] = useState('');
   const [mpSearch, setMpSearch] = useState('');
-  const [apOpen, setApOpen] = useState(false);
+  const initialApiSetup = !hasConfiguredApi();
+  const [apiSetupRequired, setApiSetupRequired] = useState(initialApiSetup);
+  const [apOpen, setApOpen] = useState(initialApiSetup);
   const [apPhase, setApPhase] = useState<'select' | 'input'>('select');
   const [apIndex, setApIndex] = useState(0);
   const [apEndpoint, setApEndpoint] = useState('');
@@ -858,7 +868,7 @@ export function App(): React.ReactElement {
       return;
     }
 
-    if (character === '?' && !mpOpen && !apOpen && !isRunning) {
+    if (character === '?' && !mpOpen && !apOpen && !isRunning && !apiSetupRequired) {
       setHelpOpen((open) => !open);
       return;
     }
@@ -969,6 +979,11 @@ export function App(): React.ReactElement {
     if (apOpen) {
 
       if (key.escape) {
+        if (apiSetupRequired && !hasConfiguredApi()) {
+          setMessages((current) => [...current, createMessage('tool', t('api_setup_required'))]);
+          return;
+        }
+
         if (apPhase === 'input') {
           setApPhase('select');
         } else {
@@ -1030,6 +1045,11 @@ export function App(): React.ReactElement {
                   createMessage('tool', t('api_changed', short))
                 ]);
               }
+
+              if (hasConfiguredApi()) {
+                setApiSetupRequired(false);
+                setApOpen(false);
+              }
             })();
           }
           return;
@@ -1070,7 +1090,7 @@ export function App(): React.ReactElement {
       return;
     }
 
-    if (key.tab && !mpOpen && !apOpen && !helpOpen && !isRunning) {
+    if (key.tab && !mpOpen && !apOpen && !helpOpen && !isRunning && !apiSetupRequired) {
       toggleAgentMode();
       return;
     }
@@ -1267,6 +1287,7 @@ export function App(): React.ReactElement {
         modelPickerCustomMode={mpCustom}
         modelPickerCustomInput={mpCustomInput}
         apiPickerOpen={apOpen}
+        apiSetupMode={apiSetupRequired}
         apiPickerPhase={apPhase}
         apiPickerIndex={apIndex}
         apiPickerEndpoint={apEndpoint}

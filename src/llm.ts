@@ -3,7 +3,10 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {hasConfiguredApi, readPrimaryEnvContent, writePrimaryEnvContent} from './envConfig.js';
 import {upsertEnvLine} from './utils.js';
+
+export {hasConfiguredApi} from './envConfig.js';
 import type {ChatCompletionMessageParam, ChatCompletionTool} from 'openai/resources/chat/completions';
 import {AnthropicProvider} from './providers/anthropic.js';
 import {OllamaProvider} from './providers/ollama.js';
@@ -384,18 +387,9 @@ function getOllamaBaseUrl(): string {
 export async function changeModel(model: string): Promise<void> {
   process.env.LLM_MODEL = model;
 
-  const lunamiRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const envPath = resolve(lunamiRoot, '.env');
-  let content = '';
-
-  try {
-    content = await readFile(envPath, 'utf8');
-  } catch {
-    content = '';
-  }
-
+  let content = await readPrimaryEnvContent();
   content = upsertEnvLine(content, 'LLM_MODEL', model);
-  await writeFile(envPath, content, 'utf8');
+  await writePrimaryEnvContent(content);
 }
 
 export function getCurrentBaseUrl(): string {
@@ -418,15 +412,7 @@ export async function changeApi(baseUrl: string, apiKey: string): Promise<void> 
     if (apiKey) process.env.OPENAI_API_KEY = apiKey;
   }
 
-  const lunamiRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const envPath = resolve(lunamiRoot, '.env');
-  let content = '';
-
-  try {
-    content = await readFile(envPath, 'utf8');
-  } catch {
-    content = '';
-  }
+  let content = await readPrimaryEnvContent();
 
   content = upsertEnvLine(content, 'LLM_PROVIDER', provider);
 
@@ -434,12 +420,13 @@ export async function changeApi(baseUrl: string, apiKey: string): Promise<void> 
     if (apiKey) content = upsertEnvLine(content, 'ANTHROPIC_API_KEY', apiKey);
   } else if (provider === 'ollama') {
     content = upsertEnvLine(content, 'OLLAMA_BASE_URL', baseUrl.replace(/\/v1\/?$/, ''));
+    content = upsertEnvLine(content, 'LLM_MODEL', process.env.LLM_MODEL || 'llama3.2');
   } else {
     content = upsertEnvLine(content, 'OPENAI_BASE_URL', baseUrl);
     if (apiKey) content = upsertEnvLine(content, 'OPENAI_API_KEY', apiKey);
   }
 
-  await writeFile(envPath, content, 'utf8');
+  await writePrimaryEnvContent(content);
 }
 
 export async function pingApiConnection(baseUrl: string, apiKey: string): Promise<{ ok: boolean; ms?: number; providerName?: string; error?: string }> {

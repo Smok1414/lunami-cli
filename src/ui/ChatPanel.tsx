@@ -59,6 +59,7 @@ type ChatPanelProps = {
   modelPickerCustomMode: boolean;
   modelPickerCustomInput: string;
   apiPickerOpen: boolean;
+  apiSetupMode?: boolean;
   apiPickerPhase: ApiPickerPhase;
   apiPickerIndex: number;
   apiPickerEndpoint: string;
@@ -111,6 +112,7 @@ export function ChatPanel(props: ChatPanelProps): React.ReactElement {
     modelPickerCustomMode,
     modelPickerCustomInput,
     apiPickerOpen,
+    apiSetupMode = false,
     apiPickerPhase,
     apiPickerIndex,
     apiPickerEndpoint,
@@ -197,7 +199,11 @@ export function ChatPanel(props: ChatPanelProps): React.ReactElement {
               />
             </ModalOverlay>
           ) : (
-            <ModalOverlay title={t('api_title')} theme={theme} height={pickerAreaHeight}>
+            <ModalOverlay
+              title={apiSetupMode ? t('api_setup_title') : t('api_title')}
+              theme={theme}
+              height={pickerAreaHeight}
+            >
               <ApiPicker
                 phase={apiPickerPhase}
                 selectedIndex={apiPickerIndex}
@@ -205,6 +211,7 @@ export function ChatPanel(props: ChatPanelProps): React.ReactElement {
                 apiKey={apiPickerKey}
                 activeField={apiPickerField}
                 currentEndpoint={apiCurrentEndpoint}
+                setupMode={apiSetupMode}
                 theme={theme}
               />
             </ModalOverlay>

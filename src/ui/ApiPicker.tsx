@@ -27,6 +27,7 @@ type ApiPickerProps = {
   apiKey: string;
   activeField: 'endpoint' | 'key';
   currentEndpoint: string;
+  setupMode?: boolean;
   theme: ThemeTokens;
 };
 
@@ -37,6 +38,7 @@ export function ApiPicker({
   apiKey,
   activeField,
   currentEndpoint,
+  setupMode = false,
   theme
 }: ApiPickerProps): React.ReactElement {
   if (phase === 'input') {
@@ -59,7 +61,15 @@ export function ApiPicker({
 
   return (
     <Box flexDirection="column">
-      <Text color={theme.muted}>{t('api_current', currentEndpoint || t('api_not_set'))}</Text>
+      {setupMode ? (
+        <>
+          <Text color={theme.accent}>{t('api_setup_intro')}</Text>
+          <Text color={theme.muted}>{t('api_setup_hint')}</Text>
+          <Text> </Text>
+        </>
+      ) : (
+        <Text color={theme.muted}>{t('api_current', currentEndpoint || t('api_not_set'))}</Text>
+      )}
       <Text> </Text>
       <Text color={theme.muted}>{t('api_quick_select')}</Text>
       {apiPresets.map((preset, index) => {
