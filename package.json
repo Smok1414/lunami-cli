@@ -1,0 +1,51 @@
+{
+  "name": "lunami-cli",
+  "version": "0.1.0",
+  "description": "Agentic AI coding assistant TUI for your terminal",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "lunami": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "ai",
+    "cli",
+    "tui",
+    "coding-agent",
+    "terminal",
+    "ink",
+    "mcp"
+  ],
+  "scripts": {
+    "dev": "node --import tsx src/index.tsx",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^16.4.7",
+    "ink": "^5.1.0",
+    "openai": "^4.104.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,5 @@
+* text=auto
+
+# Enforce LF line endings for key shell/executable entry files
+dist/index.js text eol=lf
+src/index.tsx text eol=lf
