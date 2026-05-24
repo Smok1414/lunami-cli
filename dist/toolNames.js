@@ -8,7 +8,12 @@ export const BUILTIN_TOOL_NAMES = [
     'search',
     'gitStatus',
     'gitDiff',
-    'gitCommit'
+    'gitCommit',
+    'file.read',
+    'file.write',
+    'system.exec',
+    'patchFile',
+    'file.patch'
 ];
 export function isBuiltinToolName(name) {
     return BUILTIN_TOOL_NAMES.includes(name);

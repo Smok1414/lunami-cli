@@ -6,7 +6,7 @@ export type ActivityStep = {
   id: string;
   kind: ActivityStepKind;
   label: string;
-  status: 'active' | 'done';
+  status: 'active' | 'done' | 'success' | 'failure';
   durationSec?: number;
 };
 
@@ -33,7 +33,7 @@ export function createEmptyToolCounts(): ToolActivityCounts {
 }
 
 export function bumpToolCount(counts: ToolActivityCounts, toolName: string): void {
-  if (toolName === 'readFile') {
+  if (toolName === 'readFile' || toolName === 'file.read') {
     counts.readFile += 1;
     return;
   }
@@ -48,12 +48,12 @@ export function bumpToolCount(counts: ToolActivityCounts, toolName: string): voi
     return;
   }
 
-  if (toolName === 'writeFile') {
+  if (toolName === 'writeFile' || toolName === 'file.write') {
     counts.writeFile += 1;
     return;
   }
 
-  if (toolName === 'execCommand') {
+  if (toolName === 'execCommand' || toolName === 'system.exec') {
     counts.execCommand += 1;
     return;
   }

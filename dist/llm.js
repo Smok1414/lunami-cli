@@ -1,14 +1,32 @@
 import { config } from 'dotenv';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { readPrimaryEnvContent, writePrimaryEnvContent } from './envConfig.js';
+import { isLocalApiBaseUrl, readPrimaryEnvContent, writePrimaryEnvContent } from './envConfig.js';
 import { upsertEnvLine } from './utils.js';
 export { hasConfiguredApi } from './envConfig.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OllamaProvider } from './providers/ollama.js';
 import { OpenAIProvider } from './providers/openai.js';
-config();
-config({ path: resolve(homedir(), '.lunami', '.env'), override: false });
+import { LlmRouter } from './llm/router.js';
+const localConfig = config();
+if (localConfig.parsed) {
+    for (const [key, value] of Object.entries(localConfig.parsed)) {
+        if (!value || !value.trim()) {
+            delete process.env[key];
+        }
+    }
+}
+const globalConfig = config({ path: resolve(homedir(), '.lunami', '.env'), override: false });
+if (globalConfig.parsed) {
+    for (const [key, value] of Object.entries(globalConfig.parsed)) {
+        if (value && value.trim()) {
+            const currentVal = process.env[key];
+            if (!currentVal || !currentVal.trim()) {
+                process.env[key] = value;
+            }
+        }
+    }
+}
 export const tools = [
     {
         type: 'function',
@@ -70,6 +88,46 @@ export const tools = [
                     }
                 },
                 required: ['path', 'content']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'patchFile',
+            description: 'Patch a file by replacing specific line ranges with new content. Useful for precise and partial edits.',
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    path: {
+                        type: 'string',
+                        description: 'Relative or absolute path to the file.'
+                    },
+                    patches: {
+                        type: 'array',
+                        description: 'List of line range replacements to apply.',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                startLine: {
+                                    type: 'number',
+                                    description: 'The 1-based start line number (inclusive).'
+                                },
+                                endLine: {
+                                    type: 'number',
+                                    description: 'The 1-based end line number (inclusive).'
+                                },
+                                replace: {
+                                    type: 'string',
+                                    description: 'The replacement text.'
+                                }
+                            },
+                            required: ['startLine', 'endLine', 'replace']
+                        }
+                    }
+                },
+                required: ['path', 'patches']
             }
         }
     },
@@ -179,6 +237,9 @@ Use generateProject when the user asks to scaffold a new react, node, next, or p
 Use tree, gitStatus, and gitDiff to orient yourself before risky changes.
 Prefer small, reversible changes and explain the result briefly.
 Do not invent tool results. If a file or command is needed, call the matching tool.
+When calling writeFile, always provide both string arguments exactly as separate fields: path and content. If a writeFile tool result says the call is retryable or missing path/content, immediately retry the same file write with {"path":"relative/file.ext","content":"complete file contents"}.
+Do not print internal workflow scaffolding such as PLAN/ACT/REFLECT unless the user explicitly asks for that format.
+In AUTO or YOLO mode, when the user asks to create, build, scaffold, fix, inspect, or verify something, use tools and make reasonable assumptions for small projects instead of only asking clarifying questions.
 Keep final answers concise and useful.
 Do not use markdown formatting like **bold** or *italic* — this is a plain terminal, not a browser.
 The writable workspace is the current project directory (cwd). To work in another folder, tell the user to run /cd <path> or restart with --cwd. Do not use shell cd for changing workspace — use relative paths for files (e.g. index.html) after /cd.`;
@@ -221,21 +282,51 @@ export function getModelLabel() {
         .replace(/^claude-/, '')
         .replace(/[-_](\d)(\d)$/, '-$1.$2');
 }
-export async function complete(messages, requestTools = tools) {
-    return createProvider().chat(messages, requestTools);
-}
-export async function streamComplete(messages, options = {}, requestTools = tools) {
-    const provider = createProvider();
-    if (options.onTextDelta && 'streamChat' in provider && typeof provider.streamChat === 'function') {
-        return provider.streamChat(messages, requestTools, options.onTextDelta);
+async function withIntentRouting(intent, operation) {
+    if (!intent || process.env.LLM_MODEL) {
+        return operation(createProvider());
     }
-    const response = await provider.chat(messages, requestTools);
-    if (options.onTextDelta && response.content) {
-        for (const character of Array.from(response.content)) {
-            await options.onTextDelta(character);
+    const decision = new LlmRouter().decide(intent);
+    if (!decision.model) {
+        return operation(createProvider());
+    }
+    const previousModel = process.env.LLM_MODEL;
+    try {
+        process.env.LLM_MODEL = decision.model;
+        return await operation(createProvider());
+    }
+    finally {
+        if (previousModel === undefined) {
+            delete process.env.LLM_MODEL;
+        }
+        else {
+            process.env.LLM_MODEL = previousModel;
         }
     }
-    return response;
+}
+export async function complete(messages, requestTools = tools, intent) {
+    return withIntentRouting(intent, (provider) => provider.chat(messages, getToolsForIntent(requestTools, intent)));
+}
+export async function streamComplete(messages, options = {}, requestTools = tools) {
+    return withIntentRouting(options.intent, async (provider) => {
+        const routedTools = getToolsForIntent(requestTools, options.intent);
+        if (options.onTextDelta && provider.streamChat) {
+            return provider.streamChat(messages, routedTools, options.onTextDelta);
+        }
+        const response = await provider.chat(messages, routedTools);
+        if (options.onTextDelta && response.content) {
+            for (const character of Array.from(response.content)) {
+                await options.onTextDelta(character);
+            }
+        }
+        return response;
+    });
+}
+function getToolsForIntent(requestTools, intent) {
+    if (intent === 'summary' || intent === 'chat_format' || intent === 'explanation') {
+        return [];
+    }
+    return requestTools;
 }
 export function createProvider() {
     const provider = getProviderName();
@@ -305,6 +396,31 @@ export async function changeModel(model) {
 }
 export function getCurrentBaseUrl() {
     return process.env.OPENAI_BASE_URL || process.env.OMNIROUTE_BASE_URL || '';
+}
+export async function preflightConfiguredApi() {
+    const runtime = getProviderRuntimeConfig();
+    if (runtime.provider === 'ollama') {
+        const result = await pingApiConnection(runtime.baseUrl || 'http://localhost:11434', '');
+        return result.ok
+            ? { ok: true }
+            : { ok: false, error: `Ollama endpoint is not reachable: ${result.error || 'network error'}` };
+    }
+    if (runtime.provider === 'anthropic') {
+        if (!runtime.apiKey?.trim()) {
+            return { ok: false, error: 'ANTHROPIC_API_KEY is missing. Set it in .env.' };
+        }
+        return { ok: true };
+    }
+    if (!runtime.apiKey?.trim()) {
+        return { ok: false, error: 'OPENAI_API_KEY is missing. Set it in .env.' };
+    }
+    if (isLocalApiBaseUrl(runtime.baseUrl)) {
+        const result = await pingApiConnection(runtime.baseUrl, runtime.apiKey);
+        return result.ok
+            ? { ok: true }
+            : { ok: false, error: `Local API endpoint is configured but unreachable: ${runtime.baseUrl} (${result.error || 'network error'})` };
+    }
+    return { ok: true };
 }
 export async function changeApi(baseUrl, apiKey) {
     let provider = 'openai';

@@ -23,7 +23,7 @@ const undoStack: UndoSnapshot[] = [];
  * 'auto' - инструменты с подтверждением записи и опасных команд
  * 'yolo' - инструменты без подтверждений (на свой риск)
  */
-export type AgentMode = 'plan' | 'auto' | 'yolo';
+export type AgentMode = 'plan' | 'auto' | 'yolo' | 'lunatic';
 
 export function agentSkipsApprovals(mode: AgentMode): boolean {
   return mode === 'yolo';
@@ -32,6 +32,7 @@ export function agentSkipsApprovals(mode: AgentMode): boolean {
 export function shouldSkipWriteApproval(mode: AgentMode): boolean {
   return (
     agentSkipsApprovals(mode) ||
+    mode === 'lunatic' ||
     process.env.LUNAMI_YES === '1' ||
     process.env.LUNAMI_AUTO_APPROVE_WRITES === '1'
   );

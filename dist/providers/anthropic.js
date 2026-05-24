@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { isAcceptedToolName } from '../toolNames.js';
+import { sanitizeChatCompletionMessages, sanitizeLlmTools } from './requestSanitizer.js';
 export class AnthropicProvider {
     client;
     model;
@@ -10,13 +11,14 @@ export class AnthropicProvider {
         });
     }
     async chat(messages, tools = []) {
-        const request = toAnthropicRequest(messages);
+        const requestTools = sanitizeLlmTools(tools);
+        const request = toAnthropicRequest(sanitizeChatCompletionMessages(messages));
         const response = await this.client.messages.create({
             model: this.model,
             max_tokens: 4096,
             system: request.system,
             messages: request.messages,
-            tools: tools.length > 0 ? toAnthropicTools(tools) : undefined
+            tools: requestTools.length > 0 ? toAnthropicTools(requestTools) : undefined
         });
         const content = getAnthropicText(response.content);
         const toolCalls = getAnthropicToolCalls(response.content);
@@ -36,13 +38,14 @@ export class AnthropicProvider {
         };
     }
     async streamChat(messages, requestTools = [], onDelta) {
-        const request = toAnthropicRequest(messages);
+        const sanitizedTools = sanitizeLlmTools(requestTools);
+        const request = toAnthropicRequest(sanitizeChatCompletionMessages(messages));
         const stream = this.client.messages.stream({
             model: this.model,
             max_tokens: 8192,
             system: request.system,
             messages: request.messages,
-            tools: requestTools.length > 0 ? toAnthropicTools(requestTools) : undefined
+            tools: sanitizedTools.length > 0 ? toAnthropicTools(sanitizedTools) : undefined
         });
         stream.on('text', (text) => {
             void onDelta(text);

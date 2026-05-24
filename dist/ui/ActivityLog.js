@@ -13,7 +13,7 @@ export function ActivityLog({ steps, theme, fallbackLabel }) {
                     status: 'active'
                 }]
             : [];
-    return (_jsxs(Box, { flexDirection: "column", marginTop: 1, children: [rows.map((step) => {
+    return (_jsxs(Box, { flexDirection: "column", children: [rows.map((step) => {
                 const active = step.status === 'active';
                 const iconColor = active ? theme.accent : theme.title;
                 const textColor = active ? theme.title : theme.muted;

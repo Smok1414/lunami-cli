@@ -16,6 +16,7 @@ export function agentSkipsApprovals(mode) {
 }
 export function shouldSkipWriteApproval(mode) {
     return (agentSkipsApprovals(mode) ||
+        mode === 'lunatic' ||
         process.env.LUNAMI_YES === '1' ||
         process.env.LUNAMI_AUTO_APPROVE_WRITES === '1');
 }

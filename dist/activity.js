@@ -11,7 +11,7 @@ export function createEmptyToolCounts() {
     };
 }
 export function bumpToolCount(counts, toolName) {
-    if (toolName === 'readFile') {
+    if (toolName === 'readFile' || toolName === 'file.read') {
         counts.readFile += 1;
         return;
     }
@@ -23,11 +23,11 @@ export function bumpToolCount(counts, toolName) {
         counts.search += 1;
         return;
     }
-    if (toolName === 'writeFile') {
+    if (toolName === 'writeFile' || toolName === 'file.write') {
         counts.writeFile += 1;
         return;
     }
-    if (toolName === 'execCommand') {
+    if (toolName === 'execCommand' || toolName === 'system.exec') {
         counts.execCommand += 1;
         return;
     }

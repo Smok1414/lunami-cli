@@ -25,12 +25,12 @@ export function MessageLine({ message, theme, textWidth, expanded, onToggleExpan
     if (message.kind === 'user') {
         const tsLen = showTimestamp ? message.timestamp.length + 1 : 0;
         const lines = wrapMultilineText(visibleText, textWidth, (index) => index === 0 ? 2 + tsLen : 2);
-        return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: lines.map((line, index) => (_jsxs(Text, { color: theme.user, wrap: "truncate-end", children: [index === 0 ? '▸ ' : '  ', index === 0 ? timestamp : null, line] }, `${message.id}-${index}`))) }));
+        return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: lines.map((line, index) => (_jsxs(Text, { color: theme.user, children: [index === 0 ? '▸ ' : '  ', index === 0 ? timestamp : null, line] }, `${message.id}-${index}`))) }));
     }
     if (message.kind === 'error') {
         const tsLen = showTimestamp ? message.timestamp.length + 1 : 0;
         const lines = wrapMultilineText(visibleText, textWidth, (index) => index === 0 ? 2 + tsLen : 2);
-        return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: lines.map((line, index) => (_jsxs(Text, { color: theme.error, wrap: "truncate-end", children: [index === 0 ? '! ' : '  ', index === 0 ? timestamp : null, line] }, `${message.id}-${index}`))) }));
+        return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: lines.map((line, index) => (_jsxs(Text, { color: theme.error, children: [index === 0 ? '! ' : '  ', index === 0 ? timestamp : null, line] }, `${message.id}-${index}`))) }));
     }
     if (message.kind === 'tool') {
         return (_jsx(ToolMessage, { message: message, theme: theme, textWidth: textWidth, expanded: expanded, onToggleExpand: onToggleExpand, timestamp: timestamp }));
@@ -57,7 +57,7 @@ function ToolMessage({ message, theme, textWidth, expanded, onToggleExpand, time
                 const color = diff.kind === 'add' ? theme.toolAdd : diff.kind === 'remove' ? theme.toolRemove : theme.tool;
                 const prefix = index === 0 ? `${icon} ` : '  ';
                 const gutter = diff.kind !== 'neutral' ? `${diff.gutter} ` : '  ';
-                return (_jsxs(Text, { color: color, wrap: "truncate-end", children: [prefix, index === 0 ? timestamp : null, gutter, diff.body] }, `${message.id}-${index}`));
+                return (_jsxs(Text, { color: color, children: [prefix, index === 0 ? timestamp : null, gutter, diff.body] }, `${message.id}-${index}`));
             }), collapsible && hiddenCount > 0 && !expanded ? (_jsxs(Text, { color: theme.muted, children: ['  ', t('tool_collapsed', hiddenCount), " ", t('tool_expand')] })) : null, collapsible && expanded ? (_jsxs(Text, { color: theme.muted, children: ['  ', t('tool_collapse')] })) : null] }));
 }
 function AssistantMessage({ message, theme, textWidth, timestamp, isStreaming }) {
@@ -74,7 +74,7 @@ function AssistantMessage({ message, theme, textWidth, timestamp, isStreaming })
                 messageLineOffset += codeLines.length;
                 return (_jsx(Box, { flexDirection: "column", borderStyle: "single", borderColor: theme.codeBorder, paddingX: 1, marginBottom: 1, children: codeLines.map((line, index) => {
                         const showMeta = messageLineOffset - codeLines.length + index === 0 && timestamp;
-                        return (_jsxs(Text, { color: theme.code, wrap: "truncate-end", children: [showMeta ? (_jsxs(_Fragment, { children: ["\u25C6 ", timestamp] })) : ('  '), line] }, `${message.id}-c-${segIndex}-${index}`));
+                        return (_jsxs(Text, { color: theme.code, children: [showMeta ? (_jsxs(_Fragment, { children: ["\u25C6 ", timestamp] })) : ('  '), line] }, `${message.id}-c-${segIndex}-${index}`));
                     }) }, `${message.id}-code-${segIndex}`));
             }
             const lines = wrapMultilineText(segment.text, textWidth, (index) => {
@@ -83,6 +83,6 @@ function AssistantMessage({ message, theme, textWidth, timestamp, isStreaming })
             });
             const segmentStart = messageLineOffset;
             messageLineOffset += lines.length;
-            return (_jsx(React.Fragment, { children: lines.map((line, index) => (_jsxs(Text, { color: theme.assistant, wrap: "truncate-end", children: [segmentStart + index === 0 ? '◆ ' : '  ', segmentStart + index === 0 ? timestamp : null, line, isStreaming && segIndex === segments.length - 1 && index === lines.length - 1 ? (_jsx(Text, { color: theme.accent, children: "\u258C" })) : null] }, `${message.id}-t-${segIndex}-${index}`))) }, `${message.id}-txt-${segIndex}`));
+            return (_jsx(React.Fragment, { children: lines.map((line, index) => (_jsxs(Text, { color: theme.assistant, children: [segmentStart + index === 0 ? '◆ ' : '  ', segmentStart + index === 0 ? timestamp : null, line, isStreaming && segIndex === segments.length - 1 && index === lines.length - 1 ? (_jsx(Text, { color: theme.accent, children: "\u258C" })) : null] }, `${message.id}-t-${segIndex}-${index}`))) }, `${message.id}-txt-${segIndex}`));
         }) }));
 }

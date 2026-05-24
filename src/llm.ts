@@ -3,7 +3,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {hasConfiguredApi, readPrimaryEnvContent, writePrimaryEnvContent} from './envConfig.js';
+import {hasConfiguredApi, isLocalApiBaseUrl, readPrimaryEnvContent, writePrimaryEnvContent} from './envConfig.js';
 import {upsertEnvLine} from './utils.js';
 
 export {hasConfiguredApi} from './envConfig.js';
@@ -11,10 +11,29 @@ import type {ChatCompletionMessageParam, ChatCompletionTool} from 'openai/resour
 import {AnthropicProvider} from './providers/anthropic.js';
 import {OllamaProvider} from './providers/ollama.js';
 import {OpenAIProvider} from './providers/openai.js';
+import {LlmRouter, type TaskIntent} from './llm/router.js';
 import type { BuiltinToolName } from './toolNames.js';
 
-config();
-config({path: resolve(homedir(), '.lunami', '.env'), override: false});
+const localConfig = config();
+if (localConfig.parsed) {
+  for (const [key, value] of Object.entries(localConfig.parsed)) {
+    if (!value || !value.trim()) {
+      delete process.env[key];
+    }
+  }
+}
+
+const globalConfig = config({path: resolve(homedir(), '.lunami', '.env'), override: false});
+if (globalConfig.parsed) {
+  for (const [key, value] of Object.entries(globalConfig.parsed)) {
+    if (value && value.trim()) {
+      const currentVal = process.env[key];
+      if (!currentVal || !currentVal.trim()) {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 /** Built-in LUNAMI tools (MCP tools use `mcp__<server>__<tool>` names). */
 export type LlmToolName = BuiltinToolName;
@@ -41,10 +60,16 @@ export type LLMResponse = {
 
 export interface LLMProvider {
   chat(messages: LLMMessage[], tools?: LLMTool[]): Promise<LLMResponse>;
+  streamChat?(
+    messages: LLMMessage[],
+    tools: LLMTool[],
+    onDelta: (delta: string) => void | Promise<void>
+  ): Promise<LLMResponse>;
 }
 
 export type LlmStreamOptions = {
   onTextDelta?: (delta: string) => void | Promise<void>;
+  intent?: TaskIntent;
 };
 
 export type ProviderInfo = {
@@ -118,6 +143,46 @@ export const tools: LLMTool[] = [
           }
         },
         required: ['path', 'content']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'patchFile',
+      description: 'Patch a file by replacing specific line ranges with new content. Useful for precise and partial edits.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Relative or absolute path to the file.'
+          },
+          patches: {
+            type: 'array',
+            description: 'List of line range replacements to apply.',
+            items: {
+              type: 'object',
+              properties: {
+                startLine: {
+                  type: 'number',
+                  description: 'The 1-based start line number (inclusive).'
+                },
+                endLine: {
+                  type: 'number',
+                  description: 'The 1-based end line number (inclusive).'
+                },
+                replace: {
+                  type: 'string',
+                  description: 'The replacement text.'
+                }
+              },
+              required: ['startLine', 'endLine', 'replace']
+            }
+          }
+        },
+        required: ['path', 'patches']
       }
     }
   },
@@ -228,6 +293,9 @@ Use generateProject when the user asks to scaffold a new react, node, next, or p
 Use tree, gitStatus, and gitDiff to orient yourself before risky changes.
 Prefer small, reversible changes and explain the result briefly.
 Do not invent tool results. If a file or command is needed, call the matching tool.
+When calling writeFile, always provide both string arguments exactly as separate fields: path and content. If a writeFile tool result says the call is retryable or missing path/content, immediately retry the same file write with {"path":"relative/file.ext","content":"complete file contents"}.
+Do not print internal workflow scaffolding such as PLAN/ACT/REFLECT unless the user explicitly asks for that format.
+In AUTO or YOLO mode, when the user asks to create, build, scaffold, fix, inspect, or verify something, use tools and make reasonable assumptions for small projects instead of only asking clarifying questions.
 Keep final answers concise and useful.
 Do not use markdown formatting like **bold** or *italic* — this is a plain terminal, not a browser.
 The writable workspace is the current project directory (cwd). To work in another folder, tell the user to run /cd <path> or restart with --cwd. Do not use shell cd for changing workspace — use relative paths for files (e.g. index.html) after /cd.`;
@@ -279,8 +347,39 @@ export function getModelLabel(): string {
     .replace(/[-_](\d)(\d)$/, '-$1.$2');
 }
 
-export async function complete(messages: LLMMessage[], requestTools: LLMTool[] = tools): Promise<LLMResponse> {
-  return createProvider().chat(messages, requestTools);
+async function withIntentRouting<T>(
+  intent: TaskIntent | undefined,
+  operation: (provider: LLMProvider) => Promise<T>
+): Promise<T> {
+  if (!intent || process.env.LLM_MODEL) {
+    return operation(createProvider());
+  }
+
+  const decision = new LlmRouter().decide(intent);
+  if (!decision.model) {
+    return operation(createProvider());
+  }
+
+  const previousModel = process.env.LLM_MODEL;
+
+  try {
+    process.env.LLM_MODEL = decision.model;
+    return await operation(createProvider());
+  } finally {
+    if (previousModel === undefined) {
+      delete process.env.LLM_MODEL;
+    } else {
+      process.env.LLM_MODEL = previousModel;
+    }
+  }
+}
+
+export async function complete(
+  messages: LLMMessage[],
+  requestTools: LLMTool[] = tools,
+  intent?: TaskIntent
+): Promise<LLMResponse> {
+  return withIntentRouting(intent, (provider) => provider.chat(messages, getToolsForIntent(requestTools, intent)));
 }
 
 export async function streamComplete(
@@ -288,21 +387,31 @@ export async function streamComplete(
   options: LlmStreamOptions = {},
   requestTools: LLMTool[] = tools
 ): Promise<LLMResponse> {
-  const provider = createProvider();
+  return withIntentRouting(options.intent, async (provider) => {
+    const routedTools = getToolsForIntent(requestTools, options.intent);
 
-  if (options.onTextDelta && 'streamChat' in provider && typeof (provider as any).streamChat === 'function') {
-    return (provider as any).streamChat(messages, requestTools, options.onTextDelta);
-  }
-
-  const response = await provider.chat(messages, requestTools);
-
-  if (options.onTextDelta && response.content) {
-    for (const character of Array.from(response.content)) {
-      await options.onTextDelta(character);
+    if (options.onTextDelta && provider.streamChat) {
+      return provider.streamChat(messages, routedTools, options.onTextDelta);
     }
+
+    const response = await provider.chat(messages, routedTools);
+
+    if (options.onTextDelta && response.content) {
+      for (const character of Array.from(response.content)) {
+        await options.onTextDelta(character);
+      }
+    }
+
+    return response;
+  });
+}
+
+function getToolsForIntent(requestTools: LLMTool[], intent?: TaskIntent): LLMTool[] {
+  if (intent === 'summary' || intent === 'chat_format' || intent === 'explanation') {
+    return [];
   }
 
-  return response;
+  return requestTools;
 }
 
 export function createProvider(): LLMProvider {
@@ -396,6 +505,38 @@ export function getCurrentBaseUrl(): string {
   return process.env.OPENAI_BASE_URL || process.env.OMNIROUTE_BASE_URL || '';
 }
 
+export async function preflightConfiguredApi(): Promise<{ok: boolean; error?: string}> {
+  const runtime = getProviderRuntimeConfig();
+
+  if (runtime.provider === 'ollama') {
+    const result = await pingApiConnection(runtime.baseUrl || 'http://localhost:11434', '');
+    return result.ok
+      ? {ok: true}
+      : {ok: false, error: `Ollama endpoint is not reachable: ${result.error || 'network error'}`};
+  }
+
+  if (runtime.provider === 'anthropic') {
+    if (!runtime.apiKey?.trim()) {
+      return {ok: false, error: 'ANTHROPIC_API_KEY is missing. Set it in .env.'};
+    }
+
+    return {ok: true};
+  }
+
+  if (!runtime.apiKey?.trim()) {
+    return {ok: false, error: 'OPENAI_API_KEY is missing. Set it in .env.'};
+  }
+
+  if (isLocalApiBaseUrl(runtime.baseUrl)) {
+    const result = await pingApiConnection(runtime.baseUrl!, runtime.apiKey);
+    return result.ok
+      ? {ok: true}
+      : {ok: false, error: `Local API endpoint is configured but unreachable: ${runtime.baseUrl} (${result.error || 'network error'})`};
+  }
+
+  return {ok: true};
+}
+
 export async function changeApi(baseUrl: string, apiKey: string): Promise<void> {
   let provider = 'openai';
   if (baseUrl.includes('anthropic')) provider = 'anthropic';
@@ -474,5 +615,3 @@ export async function pingApiConnection(baseUrl: string, apiKey: string): Promis
     return { ok: false, error: err.message || 'network error' };
   }
 }
-
-

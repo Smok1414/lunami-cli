@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 import { upsertEnvLine } from './utils.js';
+import { prefersAsciiOutput } from './utils/terminal.js';
 import React, { useState, useEffect } from 'react';
 
 export type Language = 'ru' | 'en';
@@ -39,6 +40,7 @@ const dictionary = {
     cmd_approve: 'approve pending dangerous action',
     cmd_auto: 'enable auto execution mode',
     cmd_yolo: 'YOLO mode (tools, no approvals)',
+    cmd_lunatic: 'autonomous mode (plan, edit, verify)',
     cmd_cd: 'change working directory',
     cmd_clear: 'clear chat',
     cmd_context: 'context: /context | set | add | clear',
@@ -48,7 +50,7 @@ const dictionary = {
     cmd_model: 'select model',
     cmd_provider: 'show current provider',
     cmd_session: 'manage sessions',
-    cmd_theme: 'cycle theme (midnight → birch → aurora → ember)',
+    cmd_theme: 'cycle theme skins',
     cmd_tree: 'show current directory tree',
     cmd_rules: 'view project rules (.lunami/rules.md, AGENTS.md)',
     cmd_undo: 'undo last file write (writeFile)',
@@ -109,6 +111,7 @@ const dictionary = {
     mode_plan: 'mode: PLAN (no file edits or commands)',
     mode_auto: 'mode: AUTO (tools, confirmations on writes)',
     mode_yolo: 'mode: YOLO (tools, no confirmations)',
+    mode_lunatic: 'mode: LUNATIC (autonomous plan, edit, verify). Use /auto to return.',
     no_approval: 'no pending approval',
     cmd_finished: 'approved command finished:',
     git_finished: 'approved git commit finished:',
@@ -120,6 +123,7 @@ const dictionary = {
     context_set: 'context set:',
     context_appended: 'context appended:',
     context_cleared: 'context cleared',
+    clear_disabled_running: 'Cannot clear session while the agent is running.',
     exported: 'exported:',
     session_created: 'session created:',
     sessions_list: 'sessions:',
@@ -164,6 +168,7 @@ const dictionary = {
     header_ctx_on: 'ctx ●',
     header_ctx_off: 'ctx ○',
     hidden_messages: '↑ {0} earlier messages',
+    hidden_messages_bottom: '↓ {0} newer messages',
     tool_expand: '[o / ↵ expand]',
     tool_collapse: '[collapse]',
     tool_collapsed: '{0} lines hidden',
@@ -174,7 +179,7 @@ const dictionary = {
     progress_tool: ' · {0}',
     shortcuts_line1: '[Ctrl+C] exit  [Tab] plan/auto/yolo  [↑↓] history  [Ctrl+L] clear  [?] help',
     shortcuts_line2: '/plan /auto /yolo /model /tree /context /theme /mcp',
-    shortcuts_bar: 'Ctrl+C exit · Tab plan/auto/yolo · ↑↓ hist · Ctrl+L clear · ? help · /yolo',
+    shortcuts_bar: 'Ctrl+C exit · Tab plan/auto/yolo · ↑↓ hist · Ctrl+L clear · ? help · /lunatic',
     shortcuts: '[Ctrl+C] exit  [↑↓] history  [Ctrl+L] clear  /plan /auto /tree /undo /context',
     help_title: 'Commands & shortcuts',
     help_close: 'Press ? or Esc to close',
@@ -260,6 +265,7 @@ const dictionary = {
     cmd_approve: 'подтвердить ожидаемое опасное действие',
     cmd_auto: 'включить режим выполнения',
     cmd_yolo: 'режим YOLO (инструменты без подтверждений)',
+    cmd_lunatic: 'автономный режим (план, правка, проверка)',
     cmd_cd: 'сменить директорию',
     cmd_clear: 'очистить чат',
     cmd_context: 'контекст: /context | set | add | clear',
@@ -269,7 +275,7 @@ const dictionary = {
     cmd_model: 'выбрать модель',
     cmd_provider: 'текущий провайдер',
     cmd_session: 'управление сессиями',
-    cmd_theme: 'сменить тему (midnight → birch → aurora → ember)',
+    cmd_theme: 'сменить скин интерфейса',
     cmd_tree: 'структура текущей папки',
     cmd_rules: 'правила проекта (.lunami/rules.md, AGENTS.md)',
     cmd_undo: 'откатить 1 последний записанный файл (writeFile)',
@@ -330,6 +336,7 @@ const dictionary = {
     mode_plan: 'режим: PLAN (без редактирования файлов и команд)',
     mode_auto: 'режим: AUTO (инструменты, подтверждение записи)',
     mode_yolo: 'режим: YOLO (инструменты без подтверждений)',
+    mode_lunatic: 'режим: LUNATIC (автономный план, правка, проверка). Используйте /auto для возврата.',
     no_approval: 'нет ожидающих подтверждений',
     cmd_finished: 'подтвержденная команда завершена:',
     git_finished: 'подтвержденный git commit завершен:',
@@ -341,6 +348,7 @@ const dictionary = {
     context_set: 'контекст установлен:',
     context_appended: 'к контексту добавлено:',
     context_cleared: 'контекст очищен',
+    clear_disabled_running: 'Нельзя очистить сессию, пока агент работает.',
     exported: 'экспортировано:',
     session_created: 'сессия создана:',
     sessions_list: 'сессии:',
@@ -385,6 +393,7 @@ const dictionary = {
     header_ctx_on: 'ctx ●',
     header_ctx_off: 'ctx ○',
     hidden_messages: '↑ ещё {0} сообщений',
+    hidden_messages_bottom: '↓ ещё {0} сообщений',
     tool_expand: '[o / ↵ развернуть]',
     tool_collapse: '[свернуть]',
     tool_collapsed: 'скрыто {0} строк',
@@ -395,7 +404,7 @@ const dictionary = {
     progress_tool: ' · {0}',
     shortcuts_line1: '[Ctrl+C] выход  [Tab] plan/auto/yolo  [↑↓] история  [Ctrl+L] очистить  [?] справка',
     shortcuts_line2: '/plan /auto /yolo /model /tree /context /theme /mcp',
-    shortcuts_bar: 'Ctrl+C выход · Tab plan/auto/yolo · ↑↓ история · Ctrl+L очистить · ? справка · /yolo',
+    shortcuts_bar: 'Ctrl+C выход · Tab plan/auto/yolo · ↑↓ история · Ctrl+L очистить · ? справка · /lunatic',
     shortcuts: '[Ctrl+C] выход  [↑↓] история  [Ctrl+L] очистить  /plan /auto /tree /undo /context',
     help_title: 'Команды и горячие клавиши',
     help_close: '? или Esc — закрыть',
@@ -451,7 +460,12 @@ const dictionary = {
   }
 };
 
-let currentLang: Language = (process.env.LUNAMI_LANG as Language) === 'en' ? 'en' : 'ru';
+let currentLang: Language =
+  process.env.LUNAMI_LANG === 'en'
+    ? 'en'
+    : process.env.LUNAMI_LANG === 'ru'
+      ? (prefersAsciiOutput() ? 'en' : 'ru')
+      : (prefersAsciiOutput() ? 'en' : 'ru');
 const listeners = new Set<() => void>();
 
 export function getLang(): Language {

@@ -1,6 +1,6 @@
 import type {AgentMode} from '../state.js';
 
-export type ThemeName = 'midnight' | 'birch' | 'aurora' | 'ember';
+export type ThemeName = 'midnight' | 'birch' | 'aurora' | 'ember' | 'glacier' | 'oxide';
 
 export type ThemeTokens = {
   background: string;
@@ -34,14 +34,14 @@ export type ThemeTokens = {
   ctxOff: string;
 };
 
-export const themeOrder: ThemeName[] = ['midnight', 'birch', 'aurora', 'ember'];
+export const themeOrder: ThemeName[] = ['midnight', 'birch', 'aurora', 'ember', 'glacier', 'oxide'];
 
 export const themes: Record<ThemeName, ThemeTokens> = {
   midnight: {
-    background: '#0a1018',
-    border: '#0f2a44',
-    borderFlash: '#3d8fd4',
-    inputBorder: '#172d45',
+    background: '#10272b',
+    border: '#2dd4bf',
+    borderFlash: '#5eead4',
+    inputBorder: '#2b6f73',
     title: '#f3ead7',
     muted: '#647181',
     accent: '#a3d9a5',
@@ -160,6 +160,68 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     modalDim: '#6b4a32',
     ctxOn: '#fb923c',
     ctxOff: '#a68a72'
+  },
+  glacier: {
+    background: '#071113',
+    border: '#21404a',
+    borderFlash: '#7dd3fc',
+    inputBorder: '#31545f',
+    title: '#f2fbff',
+    muted: '#78909a',
+    accent: '#7dd3fc',
+    planAccent: '#facc15',
+    autoAccent: '#99f6e4',
+    yoloAccent: '#fb7185',
+    user: '#ffffff',
+    userBorder: '#3b7280',
+    assistant: '#bae6fd',
+    tool: '#e0f2fe',
+    toolAdd: '#86efac',
+    toolRemove: '#fda4af',
+    error: '#fecdd3',
+    errorBorder: '#f43f5e',
+    progressFill: '#7dd3fc',
+    progressEmpty: '#31545f',
+    code: '#cffafe',
+    codeBorder: '#155e75',
+    paletteSelected: '#f2fbff',
+    paletteCmd: '#67e8f9',
+    paletteDesc: '#78909a',
+    modalTitle: '#f2fbff',
+    modalDim: '#4b6570',
+    ctxOn: '#99f6e4',
+    ctxOff: '#78909a'
+  },
+  oxide: {
+    background: '#111211',
+    border: '#41443d',
+    borderFlash: '#d7ff5f',
+    inputBorder: '#505348',
+    title: '#f8faf2',
+    muted: '#8d9285',
+    accent: '#d7ff5f',
+    planAccent: '#f5c16c',
+    autoAccent: '#d7ff5f',
+    yoloAccent: '#ff7a59',
+    user: '#ffffff',
+    userBorder: '#626854',
+    assistant: '#cbd5c0',
+    tool: '#f1f5e8',
+    toolAdd: '#9cff9c',
+    toolRemove: '#ff8a80',
+    error: '#ffc0b8',
+    errorBorder: '#e65f4f',
+    progressFill: '#d7ff5f',
+    progressEmpty: '#505348',
+    code: '#e6f0d6',
+    codeBorder: '#5b6347',
+    paletteSelected: '#f8faf2',
+    paletteCmd: '#d7ff5f',
+    paletteDesc: '#8d9285',
+    modalTitle: '#f8faf2',
+    modalDim: '#666b5d',
+    ctxOn: '#d7ff5f',
+    ctxOff: '#8d9285'
   }
 };
 
@@ -187,6 +249,10 @@ export function modeAccent(theme: ThemeTokens, mode: AgentMode): string {
 
   if (mode === 'yolo') {
     return theme.yoloAccent;
+  }
+
+  if (mode === 'lunatic') {
+    return theme.accent;
   }
 
   return theme.autoAccent;

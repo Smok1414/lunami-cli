@@ -18,4 +18,9 @@ describe('filterCommands', () => {
   it('includes /mcp command', () => {
     expect(commands.some((cmd) => cmd.name === '/mcp')).toBe(true);
   });
+
+  it('includes /lunatic autonomous command', () => {
+    expect(commands.some((cmd) => cmd.name === '/lunatic')).toBe(true);
+    expect(filterCommands('/lun').some((cmd) => cmd.name === '/lunatic')).toBe(true);
+  });
 });

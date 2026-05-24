@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type {ChatCompletionMessageToolCall} from 'openai/resources/chat/completions';
 import type {LLMMessage, LLMProvider, LLMResponse, LLMTool, LlmToolCall} from '../llm.js';
 import { isAcceptedToolName } from '../toolNames.js';
+import {sanitizeChatCompletionMessages, sanitizeLlmTools} from './requestSanitizer.js';
 
 type OpenAIProviderOptions = {
   apiKey: string;
@@ -22,11 +23,13 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async chat(messages: LLMMessage[], tools: LLMTool[] = []): Promise<LLMResponse> {
+    const requestTools = sanitizeLlmTools(tools);
+
     const response = await this.client.chat.completions.create({
       model: this.model,
-      messages,
-      tools: tools.length > 0 ? tools : undefined,
-      tool_choice: tools.length > 0 ? 'auto' : undefined
+      messages: sanitizeChatCompletionMessages(messages),
+      tools: requestTools.length > 0 ? requestTools : undefined,
+      tool_choice: requestTools.length > 0 ? 'auto' : undefined
     });
 
     const message = response.choices[0]?.message;
@@ -69,12 +72,13 @@ export class OpenAIProvider implements LLMProvider {
     onDelta: (delta: string) => void | Promise<void>
   ): Promise<LLMResponse> {
     const supportsStreamUsage = !this.client.baseURL || this.client.baseURL.includes('api.openai.com');
+    const requestTools = sanitizeLlmTools(tools);
 
     const stream = await this.client.chat.completions.create({
       model: this.model,
-      messages,
-      tools: tools.length > 0 ? tools : undefined,
-      tool_choice: tools.length > 0 ? 'auto' : undefined,
+      messages: sanitizeChatCompletionMessages(messages),
+      tools: requestTools.length > 0 ? requestTools : undefined,
+      tool_choice: requestTools.length > 0 ? 'auto' : undefined,
       stream: true,
       stream_options: supportsStreamUsage ? {include_usage: true} : undefined
     });
@@ -181,6 +185,35 @@ function parseToolArguments(rawArguments: string): Record<string, unknown> {
 
     return parsed as Record<string, unknown>;
   } catch {
-    return {};
+    return salvageToolArguments(rawArguments);
+  }
+}
+
+function salvageToolArguments(rawArguments: string): Record<string, unknown> {
+  const salvaged: Record<string, unknown> = {};
+
+  for (const key of ['path', 'filePath', 'filepath', 'filename', 'targetPath', 'target', 'name', 'content']) {
+    const value = extractJsonStringProperty(rawArguments, key);
+
+    if (value !== undefined) {
+      salvaged[key] = value;
+    }
+  }
+
+  return salvaged;
+}
+
+function extractJsonStringProperty(source: string, key: string): string | undefined {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`"${escapedKey}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`).exec(source);
+
+  if (!match) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch {
+    return match[1];
   }
 }

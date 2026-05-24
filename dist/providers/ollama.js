@@ -1,4 +1,5 @@
 import { isAcceptedToolName } from '../toolNames.js';
+import { sanitizeChatCompletionMessages, sanitizeLlmTools } from './requestSanitizer.js';
 export class OllamaProvider {
     model;
     baseUrl;
@@ -7,6 +8,7 @@ export class OllamaProvider {
         this.baseUrl = options.baseUrl.replace(/\/$/, '');
     }
     async chat(messages, tools = []) {
+        const requestTools = sanitizeLlmTools(tools);
         const response = await fetch(`${this.baseUrl}/api/chat`, {
             method: 'POST',
             headers: {
@@ -14,8 +16,8 @@ export class OllamaProvider {
             },
             body: JSON.stringify({
                 model: this.model,
-                messages: toOllamaMessages(messages),
-                tools: tools.length > 0 ? toOllamaTools(tools) : undefined,
+                messages: toOllamaMessages(sanitizeChatCompletionMessages(messages)),
+                tools: requestTools.length > 0 ? toOllamaTools(requestTools) : undefined,
                 stream: false
             })
         });

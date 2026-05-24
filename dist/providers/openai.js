@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { isAcceptedToolName } from '../toolNames.js';
+import { sanitizeChatCompletionMessages, sanitizeLlmTools } from './requestSanitizer.js';
 export class OpenAIProvider {
     client;
     model;
@@ -11,11 +12,12 @@ export class OpenAIProvider {
         });
     }
     async chat(messages, tools = []) {
+        const requestTools = sanitizeLlmTools(tools);
         const response = await this.client.chat.completions.create({
             model: this.model,
-            messages,
-            tools: tools.length > 0 ? tools : undefined,
-            tool_choice: tools.length > 0 ? 'auto' : undefined
+            messages: sanitizeChatCompletionMessages(messages),
+            tools: requestTools.length > 0 ? requestTools : undefined,
+            tool_choice: requestTools.length > 0 ? 'auto' : undefined
         });
         const message = response.choices[0]?.message;
         if (!message) {
@@ -48,11 +50,12 @@ export class OpenAIProvider {
     }
     async streamChat(messages, tools = [], onDelta) {
         const supportsStreamUsage = !this.client.baseURL || this.client.baseURL.includes('api.openai.com');
+        const requestTools = sanitizeLlmTools(tools);
         const stream = await this.client.chat.completions.create({
             model: this.model,
-            messages,
-            tools: tools.length > 0 ? tools : undefined,
-            tool_choice: tools.length > 0 ? 'auto' : undefined,
+            messages: sanitizeChatCompletionMessages(messages),
+            tools: requestTools.length > 0 ? requestTools : undefined,
+            tool_choice: requestTools.length > 0 ? 'auto' : undefined,
             stream: true,
             stream_options: supportsStreamUsage ? { include_usage: true } : undefined
         });
@@ -143,6 +146,29 @@ function parseToolArguments(rawArguments) {
         return parsed;
     }
     catch {
-        return {};
+        return salvageToolArguments(rawArguments);
+    }
+}
+function salvageToolArguments(rawArguments) {
+    const salvaged = {};
+    for (const key of ['path', 'filePath', 'filepath', 'filename', 'targetPath', 'target', 'name', 'content']) {
+        const value = extractJsonStringProperty(rawArguments, key);
+        if (value !== undefined) {
+            salvaged[key] = value;
+        }
+    }
+    return salvaged;
+}
+function extractJsonStringProperty(source, key) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = new RegExp(`"${escapedKey}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`).exec(source);
+    if (!match) {
+        return undefined;
+    }
+    try {
+        return JSON.parse(`"${match[1]}"`);
+    }
+    catch {
+        return match[1];
     }
 }

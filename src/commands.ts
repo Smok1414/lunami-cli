@@ -16,6 +16,7 @@ export const commands: CommandDefinition[] = [
   {name: '/plan', group: 'agent', get description() { return t('cmd_plan'); }},
   {name: '/auto', group: 'agent', get description() { return t('cmd_auto'); }},
   {name: '/yolo', group: 'agent', get description() { return t('cmd_yolo'); }},
+  {name: '/lunatic', group: 'agent', get description() { return t('cmd_lunatic'); }},
   {name: '/approve', group: 'agent', get description() { return t('cmd_approve'); }},
   {name: '/deny', group: 'agent', get description() { return t('cmd_deny'); }},
   {name: '/undo', group: 'agent', get description() { return t('cmd_undo'); }},

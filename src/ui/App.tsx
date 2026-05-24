@@ -34,32 +34,26 @@ import {
 } from '../state.js';
 import {execCommand} from '../tools/exec.js';
 import {undoLastWrite, writeFile} from '../tools/fs.js';
+import {TreeTool} from '../tools/file/tree.tool.js';
+import {GitCommitTool} from '../tools/system/git.tool.js';
 import {resolveMentions} from '../mentions.js';
-import {gitCommit} from '../tools/git.js';
-import {listTree} from '../tools/tree.js';
 import {
-  clearMemory,
-  createSession,
-  createEmptyMemory,
+  LongMemory,
   defaultSessionName,
-  deleteSession,
-  exportMemory,
-  listSessions,
-  loadMemory,
-  loadCurrentSessionName,
-  saveMemory,
-  sessionExists,
-  setCurrentSessionName,
   type MemoryState,
-  type StoredUiMessage,
-  type ThemeName
-} from '../memory.js';
+  type StoredUiMessage
+} from '../core/memory/long.memory.js';
 import {fallbackGroups, fetchDynamicGroups, flattenModelGroups, getTotalPickerEntries} from '../models.js';
-import {ChatPanel, getPaletteHeight, isCollapsibleToolMessage, type UiMessage} from './ChatPanel.js';
+import {ChatPanel, getPaletteHeight, isCollapsibleToolMessage, type UiMessage} from './components/chatPanel.js';
 import {estimateMessageLines} from './chatUtils.js';
 import {nextThemeName} from './theme.js';
-import {apiPresets} from './ApiPicker.js';
+import {apiPresets} from './components/apiPicker.js';
+import type {ThemeName} from './theme.js';
 import { t, useLang, changeLang, getLang } from '../i18n.js';
+
+const longMemory = new LongMemory();
+const treeTool = new TreeTool();
+const gitCommitTool = new GitCommitTool();
 
 export function App(): React.ReactElement {
   useLang();
@@ -70,6 +64,14 @@ export function App(): React.ReactElement {
   const [pastedText, setPastedText] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatCompletionMessageParam[]>([]);
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [scrollOffset, setScrollOffset] = useState(0);
+
+  React.useEffect(() => {
+    if (scrollOffset > 0 && scrollOffset >= messages.length) {
+      setScrollOffset(Math.max(0, messages.length - 1));
+    }
+  }, [messages.length, scrollOffset]);
+
   const [status, setStatus] = useState<AgentStatus>('IDLE');
   const [progress, setProgress] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -137,7 +139,7 @@ export function App(): React.ReactElement {
   const modelLabel = getModelLabel();
 
   const filteredPaletteCommands = useMemo(() => filterCommands(input), [input]);
-  const paletteVisible = input.startsWith('/') && !input.includes(' ') && !paletteDismissed && !isRunning;
+  const paletteVisible = input.startsWith('/') && !input.includes(' ') && !paletteDismissed;
   const clampedPaletteIndex = Math.min(paletteIndex, Math.max(0, filteredPaletteCommands.length - 1));
 
   const filteredMpGroups = useMemo(() => {
@@ -172,8 +174,8 @@ export function App(): React.ReactElement {
     let cancelled = false;
 
     void (async () => {
-      const activeSessionName = await loadCurrentSessionName();
-      const memory = await loadMemory(modelLabel, activeSessionName);
+      const activeSessionName = await longMemory.loadCurrentSessionName();
+      const memory = await longMemory.loadMemory(modelLabel, activeSessionName);
 
       if (cancelled) {
         return;
@@ -202,7 +204,7 @@ export function App(): React.ReactElement {
     }
 
     const timer = setTimeout(() => {
-      void saveMemory(createMemorySnapshot({
+      void longMemory.saveMemory(createMemorySnapshot({
         modelLabel,
         sessionName,
         themeName,
@@ -298,13 +300,14 @@ export function App(): React.ReactElement {
     setMessages([]);
     setPromptHistory([]);
     setHistoryIndex(null);
+    setScrollOffset(0);
     setProgress(0);
     setTokenCount(0);
     setStatus('IDLE');
     setActivitySteps([]);
     setPaletteDismissed(false);
     setPaletteIndex(0);
-    await clearMemory(sessionName);
+    await longMemory.clearMemory(sessionName);
   }, [clearScreen, sessionName]);
 
   const saveCurrentSession = useCallback(async (): Promise<void> => {
@@ -312,7 +315,7 @@ export function App(): React.ReactElement {
       return;
     }
 
-    await saveMemory(createMemorySnapshot({
+    await longMemory.saveMemory(createMemorySnapshot({
       modelLabel,
       sessionName,
       themeName,
@@ -332,7 +335,7 @@ export function App(): React.ReactElement {
       await saveCurrentSession();
       setMemoryReady(false);
 
-      const memory = await createSession(nextSessionName, modelLabel);
+      const memory = await longMemory.createSession(nextSessionName, modelLabel);
 
       applyMemoryState(memory);
       setMessages((current) => [...current, createMessage('tool', `${t('session_created')} ${nextSessionName}`)]);
@@ -341,7 +344,7 @@ export function App(): React.ReactElement {
     }
 
     if (action === 'list') {
-      const sessions = [...new Set([...(await listSessions()), sessionName])].sort((left, right) => left.localeCompare(right));
+      const sessions = [...new Set([...(await longMemory.listSessions()), sessionName])].sort((left, right) => left.localeCompare(right));
       const summary = sessions.map((name) => (name === sessionName ? `[${name}]` : name)).join(', ');
 
       setMessages((current) => [...current, createMessage('tool', `${t('sessions_list')} ${summary}`)]);
@@ -352,15 +355,15 @@ export function App(): React.ReactElement {
     if (action === 'switch') {
       const nextSessionName = requireSessionName(rawName);
 
-      if (!(await sessionExists(nextSessionName)) && nextSessionName !== defaultSessionName) {
+      if (!(await longMemory.sessionExists(nextSessionName)) && nextSessionName !== defaultSessionName) {
         throw new Error(t('err_session_not_found', nextSessionName));
       }
 
       await saveCurrentSession();
       setMemoryReady(false);
-      await setCurrentSessionName(nextSessionName);
+      await longMemory.setCurrentSessionName(nextSessionName);
 
-      const memory = await loadMemory(modelLabel, nextSessionName);
+      const memory = await longMemory.loadMemory(modelLabel, nextSessionName);
 
       applyMemoryState(memory);
       setMessages((current) => [...current, createMessage('tool', `${t('session_switched')} ${nextSessionName}`)]);
@@ -371,29 +374,29 @@ export function App(): React.ReactElement {
     if (action === 'delete') {
       const targetSessionName = requireSessionName(rawName);
 
-      const targetExists = await sessionExists(targetSessionName);
+      const targetExists = await longMemory.sessionExists(targetSessionName);
 
       if (!targetExists && targetSessionName !== sessionName) {
         throw new Error(t('err_session_not_found', targetSessionName));
       }
 
       if (targetSessionName !== sessionName) {
-        await deleteSession(targetSessionName);
+        await longMemory.deleteSession(targetSessionName);
         setMessages((current) => [...current, createMessage('tool', `${t('session_deleted')} ${targetSessionName}`)]);
         setStatus('IDLE');
         return;
       }
 
       setMemoryReady(false);
-      await deleteSession(targetSessionName);
+      await longMemory.deleteSession(targetSessionName);
 
-      const remainingSessions = (await listSessions()).filter((name) => name !== targetSessionName);
+      const remainingSessions = (await longMemory.listSessions()).filter((name) => name !== targetSessionName);
       const nextSessionName = remainingSessions[0] ?? defaultSessionName;
-      const memory = (await sessionExists(nextSessionName))
-        ? await loadMemory(modelLabel, nextSessionName)
-        : await createSession(nextSessionName, modelLabel);
+      const memory = (await longMemory.sessionExists(nextSessionName))
+        ? await longMemory.loadMemory(modelLabel, nextSessionName)
+        : await longMemory.createSession(nextSessionName, modelLabel);
 
-      await setCurrentSessionName(nextSessionName);
+      await longMemory.setCurrentSessionName(nextSessionName);
       applyMemoryState(memory);
       setMessages((current) => [
         ...current,
@@ -445,6 +448,7 @@ export function App(): React.ReactElement {
         const finalHistory = await runAgent({
           history: nextHistory,
           sessionName,
+          mode: agentMode,
           onEvent: handleEvent
         });
         setHistory(finalHistory);
@@ -454,17 +458,22 @@ export function App(): React.ReactElement {
         setMessages((current) => [...current, createMessage('error', message)]);
         setStatus('ERROR');
       } finally {
+        setCwdLabel(getDisplayCwd());
         setIsRunning(false);
       }
     } else {
       setStatus('IDLE');
     }
-  }, [handleEvent, history, sessionName, syncWriteApprovalUi]);
+  }, [agentMode, handleEvent, history, sessionName, syncWriteApprovalUi]);
 
   const runSlashCommand = useCallback(async (prompt: string): Promise<void> => {
     const [command = ''] = prompt.slice(1).trim().split(/\s+/);
 
     if (command === 'clear') {
+      if (isRunning) {
+        setMessages((current) => [...current, createMessage('error', t('clear_disabled_running'))]);
+        return;
+      }
       void resetSession();
       return;
     }
@@ -473,7 +482,7 @@ export function App(): React.ReactElement {
       const nextTheme = nextThemeName(themeName);
       setThemeName(nextTheme);
       setMessages((current) => [...current, createMessage('tool', `${t('theme_changed')} ${nextTheme}`)]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -481,7 +490,7 @@ export function App(): React.ReactElement {
       setAgentMode('plan');
       setAgentModeState('plan');
       setMessages((current) => [...current, createMessage('tool', t('mode_plan'))]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -489,7 +498,7 @@ export function App(): React.ReactElement {
       setAgentMode('auto');
       setAgentModeState('auto');
       setMessages((current) => [...current, createMessage('tool', t('mode_auto'))]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -497,7 +506,15 @@ export function App(): React.ReactElement {
       setAgentMode('yolo');
       setAgentModeState('yolo');
       setMessages((current) => [...current, createMessage('tool', t('mode_yolo'))]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
+      return;
+    }
+
+    if (command === 'lunatic') {
+      setAgentMode('lunatic');
+      setAgentModeState('lunatic');
+      setMessages((current) => [...current, createMessage('tool', t('mode_lunatic'))]);
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -521,10 +538,11 @@ export function App(): React.ReactElement {
 
       if (approval.type === 'execCommand') {
         result = await execCommand(approval.command);
+        setCwdLabel(getDisplayCwd());
         toolCallResultStr = JSON.stringify(result);
         finalMessageStr = `${t('cmd_finished')} ${result.exitCode}\n${trimToolOutput(result.stdout || result.stderr || '')}`;
       } else {
-        result = await gitCommit(approval.message);
+        result = await gitCommitTool.commit(approval.message);
         toolCallResultStr = JSON.stringify(result);
         finalMessageStr = `${t('git_finished')} ${result.exitCode}\n${trimToolOutput(result.stdout || result.stderr || '')}`;
       }
@@ -544,6 +562,7 @@ export function App(): React.ReactElement {
           const finalHistory = await runAgent({
             history: nextHistory,
             sessionName,
+            mode: agentMode,
             onEvent: handleEvent
           });
           setHistory(finalHistory);
@@ -553,6 +572,7 @@ export function App(): React.ReactElement {
           setMessages((current) => [...current, createMessage('error', message)]);
           setStatus('ERROR');
         } finally {
+          setCwdLabel(getDisplayCwd());
           setIsRunning(false);
         }
       }
@@ -590,21 +610,21 @@ export function App(): React.ReactElement {
         ]);
       }
 
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
     if (command === 'undo') {
       const result = await undoLastWrite();
       setMessages((current) => [...current, createMessage('tool', `${t('undo_msg')} ${result.path} ${result.action}`)]);
-      setStatus('DONE');
+      if (!isRunning) setStatus('DONE');
       return;
     }
 
     if (command === 'tree') {
-      const result = await listTree(2);
+      const result = await treeTool.list(2);
       setMessages((current) => [...current, createMessage('tool', result.tree)]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -626,35 +646,35 @@ export function App(): React.ReactElement {
           ]);
         }
 
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
         return;
       }
 
       if (action === 'set') {
         if (!contextBody) {
           setMessages((current) => [...current, createMessage('error', t('usage_context'))]);
-          setStatus('ERROR');
+          if (!isRunning) setStatus('ERROR');
           return;
         }
 
         const path = await writeProjectContext(contextBody);
         await refreshContext();
         setMessages((current) => [...current, createMessage('tool', `${t('context_set')} ${path}`)]);
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
         return;
       }
 
       if (action === 'add') {
         if (!contextBody) {
           setMessages((current) => [...current, createMessage('error', t('usage_context'))]);
-          setStatus('ERROR');
+          if (!isRunning) setStatus('ERROR');
           return;
         }
 
         const path = await appendProjectContext(contextBody);
         await refreshContext();
         setMessages((current) => [...current, createMessage('tool', `${t('context_appended')} ${path}`)]);
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
         return;
       }
 
@@ -662,17 +682,17 @@ export function App(): React.ReactElement {
         await clearProjectContext();
         await refreshContext();
         setMessages((current) => [...current, createMessage('tool', t('context_cleared'))]);
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
         return;
       }
 
       setMessages((current) => [...current, createMessage('error', t('usage_context'))]);
-      setStatus('ERROR');
+      if (!isRunning) setStatus('ERROR');
       return;
     }
 
     if (command === 'export') {
-      const result = await exportMemory(createMemorySnapshot({
+      const result = await longMemory.exportMemory(createMemorySnapshot({
         modelLabel,
         sessionName,
         themeName,
@@ -683,7 +703,7 @@ export function App(): React.ReactElement {
       }));
 
       setMessages((current) => [...current, createMessage('tool', `${t('exported')} ${result.path}`)]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -700,16 +720,16 @@ export function App(): React.ReactElement {
         ...current,
         createMessage('tool', t('provider_info', providerInfo.provider, providerInfo.model) + baseUrl)
       ]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
     if (command === 'cd') {
-      const target = prompt.slice(1).trim().split(/\s+/).slice(1).join(' ').trim();
+      const target = stripOuterQuotes(prompt.slice(1).trim().split(/\s+/).slice(1).join(' '));
 
       if (!target) {
         setMessages((current) => [...current, createMessage('tool', `${t('cwd_msg')} ${getDisplayCwd()}`)]);
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
         return;
       }
 
@@ -720,7 +740,7 @@ export function App(): React.ReactElement {
         ...current,
         createMessage('tool', `${t('cwd_msg')} ${newLabel}\n${t('cwd_workspace_hint')}`)
       ]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -732,7 +752,7 @@ export function App(): React.ReactElement {
       setMpCustomInput('');
       setMpGroups(fallbackGroups);
       setMpLoading(true);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
 
       const requestId = modelFetchIdRef.current + 1;
       modelFetchIdRef.current = requestId;
@@ -758,7 +778,7 @@ export function App(): React.ReactElement {
       setApEndpoint(getCurrentBaseUrl());
       setApKey(process.env.OPENAI_API_KEY ?? '');
       setApField('endpoint');
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
@@ -767,10 +787,10 @@ export function App(): React.ReactElement {
       const targetLang = rest[0];
       if (targetLang === 'en' || targetLang === 'ru') {
         await changeLang(targetLang as 'en' | 'ru');
-        setStatus('IDLE');
+        if (!isRunning) setStatus('IDLE');
       } else {
         setMessages((current) => [...current, createMessage('error', t('usage_lang'))]);
-        setStatus('ERROR');
+        if (!isRunning) setStatus('ERROR');
       }
       return;
     }
@@ -792,28 +812,29 @@ export function App(): React.ReactElement {
           false
         )
       ]);
-      setStatus('IDLE');
+      if (!isRunning) setStatus('IDLE');
       return;
     }
 
     setMessages((current) => [...current, createMessage('error', t('unknown_cmd', command))]);
-    setStatus('ERROR');
-  }, [clearScreen, handleEvent, history, messages, modelLabel, promptHistory, resolveWriteApproval, runSessionCommand, sessionName, themeName, tokenCount]);
+    if (!isRunning) setStatus('ERROR');
+  }, [agentMode, clearScreen, handleEvent, history, isRunning, messages, modelLabel, promptHistory, resolveWriteApproval, runSessionCommand, sessionName, themeName, tokenCount]);
 
   const submit = useCallback(async () => {
     const combinedInput = pastedText ? `${pastedText}\n${input}` : input;
     const prompt = combinedInput.trim();
 
-    if (!prompt || isRunning) {
+    if (!prompt) {
       return;
     }
 
-    setInput('');
-    setPastedText(null);
-    setHistoryIndex(null);
-    setPromptHistory((current) => [...current, prompt]);
+    if (prompt.startsWith('/') && !prompt.includes('\n')) {
+      setInput('');
+      setPastedText(null);
+      setHistoryIndex(null);
+      setScrollOffset(0);
+      setPromptHistory((current) => [...current, prompt]);
 
-    if (prompt.startsWith('/')) {
       try {
         await runSlashCommand(prompt);
       } catch (error) {
@@ -824,6 +845,16 @@ export function App(): React.ReactElement {
 
       return;
     }
+
+    if (isRunning) {
+      return;
+    }
+
+    setInput('');
+    setPastedText(null);
+    setHistoryIndex(null);
+    setScrollOffset(0);
+    setPromptHistory((current) => [...current, prompt]);
 
     setIsRunning(true);
     setProgress(10);
@@ -847,6 +878,7 @@ export function App(): React.ReactElement {
         mentionPreamble: mentionResult.preamble || undefined,
         history,
         sessionName,
+        mode: agentMode,
         skipWriteApproval: shouldSkipWriteApproval(agentMode),
         onEvent: handleEvent
       });
@@ -858,6 +890,7 @@ export function App(): React.ReactElement {
       setMessages((current) => [...current, createMessage('error', message)]);
       setStatus('ERROR');
     } finally {
+      setCwdLabel(getDisplayCwd());
       setIsRunning(false);
     }
   }, [agentMode, handleEvent, history, input, isRunning, pastedText, runSlashCommand, sessionName, syncWriteApprovalUi]);
@@ -1076,6 +1109,23 @@ export function App(): React.ReactElement {
     }
 
     // --- Normal mode ---
+    if (key.pageUp) {
+      setScrollOffset((c) => Math.min(Math.max(0, messages.length - 1), c + 3));
+      return;
+    }
+    if (key.pageDown) {
+      setScrollOffset((c) => Math.max(0, c - 3));
+      return;
+    }
+    if (key.ctrl && key.upArrow) {
+      setScrollOffset((c) => Math.min(Math.max(0, messages.length - 1), c + 1));
+      return;
+    }
+    if (key.ctrl && key.downArrow) {
+      setScrollOffset((c) => Math.max(0, c - 1));
+      return;
+    }
+
     if (key.escape) {
       if (paletteVisible) {
         setPaletteDismissed(true);
@@ -1086,7 +1136,9 @@ export function App(): React.ReactElement {
     }
 
     if (key.ctrl && character === 'l') {
-      void resetSession();
+      if (!isRunning) {
+        void resetSession();
+      }
       return;
     }
 
@@ -1095,7 +1147,7 @@ export function App(): React.ReactElement {
       return;
     }
 
-    if (isRunning || writeApprovalOpen) {
+    if (writeApprovalOpen) {
       return;
     }
 
@@ -1126,7 +1178,7 @@ export function App(): React.ReactElement {
         const nextIndex = historyIndex === null ? promptHistory.length - 1 : Math.max(0, historyIndex - 1);
         setHistoryIndex(nextIndex);
         const nextPrompt = promptHistory[nextIndex] ?? '';
-        if (nextPrompt.length > 150 || nextPrompt.includes('\n')) {
+        if (nextPrompt.includes('\n') || nextPrompt.includes('\r')) {
           setPastedText(nextPrompt);
           setInput('');
         } else {
@@ -1152,7 +1204,7 @@ export function App(): React.ReactElement {
         } else {
           setHistoryIndex(nextIndex);
           const nextPrompt = promptHistory[nextIndex] ?? '';
-          if (nextPrompt.length > 150 || nextPrompt.includes('\n')) {
+          if (nextPrompt.includes('\n') || nextPrompt.includes('\r')) {
             setPastedText(nextPrompt);
             setInput('');
           } else {
@@ -1177,7 +1229,7 @@ export function App(): React.ReactElement {
 
     if (character && !key.ctrl && !key.meta) {
       setHistoryIndex(null);
-      if (character.length > 50 || character.includes('\n') || character.includes('\r')) {
+      if (character.includes('\n') || character.includes('\r')) {
         setPastedText(character);
       } else {
         setInput((current) => current + character);
@@ -1193,18 +1245,30 @@ export function App(): React.ReactElement {
 
   const paletteHeight = paletteVisible ? getPaletteHeight(filteredPaletteCommands.length) : 0;
 
-  const {visibleMessages, hiddenMessageCount} = useMemo(() => {
-    const chromeLines = 16 + (isBusy ? 3 : 0) + paletteHeight;
+  const {visibleMessages, hiddenMessageCount, hiddenMessageCountBottom} = useMemo(() => {
+    const hiddenBottom = Math.min(scrollOffset, messages.length);
+    const endIndex = messages.length - 1 - hiddenBottom;
+
+    if (endIndex < 0 || messages.length === 0) {
+      return {
+        visibleMessages: [],
+        hiddenMessageCount: 0,
+        hiddenMessageCountBottom: messages.length
+      };
+    }
+
+    const activityLines = isBusy ? Math.max(2, activitySteps.length || 1) + 1 : 0;
+    const chromeLines = 16 + activityLines + paletteHeight + (hiddenBottom > 0 ? 1 : 0);
     const availableLines = Math.max(4, terminalHeight - chromeLines);
     const textWidth = Math.max(24, terminalWidth - 20);
 
     let totalLines = 0;
-    let startIndex = messages.length;
+    let startIndex = endIndex + 1;
 
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
+    for (let i = endIndex; i >= 0; i -= 1) {
       const msg = messages[i]!;
       const lines = estimateMessageLines(msg.text, textWidth) + (msg.kind === 'user' || msg.kind === 'error' ? 2 : 1);
-      if (totalLines + lines > availableLines && startIndex < messages.length) {
+      if (totalLines + lines > availableLines && startIndex <= endIndex) {
         break;
       }
       totalLines += lines;
@@ -1212,10 +1276,11 @@ export function App(): React.ReactElement {
     }
 
     return {
-      visibleMessages: messages.slice(startIndex),
-      hiddenMessageCount: startIndex
+      visibleMessages: messages.slice(startIndex, endIndex + 1),
+      hiddenMessageCount: startIndex,
+      hiddenMessageCountBottom: hiddenBottom
     };
-  }, [messages, terminalHeight, terminalWidth, isBusy, paletteHeight]);
+  }, [messages, terminalHeight, terminalWidth, isBusy, activitySteps, paletteHeight, scrollOffset]);
 
   const toggleToolExpand = useCallback((id: string) => {
     setExpandedToolIds((current) => {
@@ -1257,6 +1322,7 @@ export function App(): React.ReactElement {
         pastedText={pastedText}
         messages={visibleMessages}
         hiddenMessageCount={hiddenMessageCount}
+        hiddenMessageCountBottom={hiddenMessageCountBottom}
         progress={progress}
         progressRound={progressRound}
         progressTool={progressTool}
@@ -1358,7 +1424,7 @@ function createMemorySnapshot(input: {
   messages: UiMessage[];
 }): MemoryState {
   return {
-    ...createEmptyMemory(input.modelLabel, input.sessionName),
+    ...longMemory.createEmptyMemory(input.modelLabel, input.sessionName),
     sessionName: input.sessionName,
     modelLabel: input.modelLabel,
     themeName: input.themeName,
@@ -1382,6 +1448,18 @@ function requireSessionName(name: string): string {
   }
 
   return trimmedName;
+}
+
+function stripOuterQuotes(value: string): string {
+  const trimmed = value.trim();
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+
+  if ((first === '"' || first === "'") && first === last) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
 }
 
 function isThinkingPlaceholder(message: UiMessage): boolean {

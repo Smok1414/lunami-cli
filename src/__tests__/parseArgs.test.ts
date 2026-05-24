@@ -15,6 +15,16 @@ describe('parseArgs', () => {
     expect(args.prompt).toBe('task');
   });
 
+  it('uses -v for verbose and -V for version', () => {
+    const verboseArgs = parseArgs(['node', 'lunami', '-v']);
+    const versionArgs = parseArgs(['node', 'lunami', '-V']);
+
+    expect(verboseArgs.verbose).toBe(true);
+    expect(verboseArgs.version).toBe(false);
+    expect(versionArgs.version).toBe(true);
+    expect(versionArgs.verbose).toBe(false);
+  });
+
   it('throws when flag requires value', () => {
     expect(() => parseArgs(['node', 'lunami', '--prompt'])).toThrow(ParseArgsError);
   });

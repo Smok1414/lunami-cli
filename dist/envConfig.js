@@ -14,6 +14,9 @@ export function isPlaceholderApiKey(key) {
         normalized.startsWith('sk-...') ||
         normalized === 'changeme');
 }
+export function isLocalApiBaseUrl(baseUrl) {
+    return Boolean(baseUrl && /localhost|127\.0\.0\.1/i.test(baseUrl));
+}
 export function hasConfiguredApi() {
     const provider = (process.env.LLM_PROVIDER || 'openai').toLowerCase();
     if (provider === 'ollama') {
@@ -23,7 +26,7 @@ export function hasConfiguredApi() {
         return !isPlaceholderApiKey(process.env.ANTHROPIC_API_KEY);
     }
     const baseUrl = process.env.OPENAI_BASE_URL || process.env.OMNIROUTE_BASE_URL || '';
-    if (baseUrl && /localhost|127\.0\.0\.1/i.test(baseUrl)) {
+    if (isLocalApiBaseUrl(baseUrl)) {
         return true;
     }
     const apiKey = process.env.OPENAI_API_KEY || process.env.OMNIROUTE_API_KEY;

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type {LLMMessage, LLMProvider, LLMResponse, LLMTool, LlmToolCall} from '../llm.js';
 import { isAcceptedToolName } from '../toolNames.js';
+import {sanitizeChatCompletionMessages, sanitizeLlmTools} from './requestSanitizer.js';
 
 type AnthropicProviderOptions = {
   apiKey: string;
@@ -24,13 +25,14 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async chat(messages: LLMMessage[], tools: LLMTool[] = []): Promise<LLMResponse> {
-    const request = toAnthropicRequest(messages);
+    const requestTools = sanitizeLlmTools(tools);
+    const request = toAnthropicRequest(sanitizeChatCompletionMessages(messages));
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 4096,
       system: request.system,
       messages: request.messages as Anthropic.MessageParam[],
-      tools: tools.length > 0 ? toAnthropicTools(tools) as Anthropic.Tool[] : undefined
+      tools: requestTools.length > 0 ? toAnthropicTools(requestTools) as Anthropic.Tool[] : undefined
     });
 
     const content = getAnthropicText(response.content);
@@ -57,14 +59,15 @@ export class AnthropicProvider implements LLMProvider {
     requestTools: LLMTool[] = [],
     onDelta: (delta: string) => void | Promise<void>
   ): Promise<LLMResponse> {
-    const request = toAnthropicRequest(messages);
+    const sanitizedTools = sanitizeLlmTools(requestTools);
+    const request = toAnthropicRequest(sanitizeChatCompletionMessages(messages));
 
     const stream = this.client.messages.stream({
       model: this.model,
       max_tokens: 8192,
       system: request.system,
       messages: request.messages as Anthropic.MessageParam[],
-      tools: requestTools.length > 0 ? toAnthropicTools(requestTools) as Anthropic.Tool[] : undefined
+      tools: sanitizedTools.length > 0 ? toAnthropicTools(sanitizedTools) as Anthropic.Tool[] : undefined
     });
 
     stream.on('text', (text) => {
@@ -267,4 +270,3 @@ function parseToolInput(rawArguments: string): Record<string, unknown> {
     return {};
   }
 }
-

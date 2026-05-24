@@ -4,7 +4,7 @@ import { flattenModelGroups } from '../models.js';
 import { useBlink } from './hooks/useBlink.js';
 import { t } from '../i18n.js';
 export function ModelPicker({ groups, search, loading = false, selectedIndex, customMode, customInput, theme }) {
-    const cursorVisible = useBlink();
+    const caretVisible = useBlink();
     const flatModels = flattenModelGroups(groups);
     const renderItems = [];
     renderItems.push({ type: 'custom' });
@@ -35,9 +35,9 @@ export function ModelPicker({ groups, search, loading = false, selectedIndex, cu
         }
     }
     const visibleItems = renderItems.slice(startIndex, startIndex + maxVisibleItems);
-    return (_jsxs(Box, { flexDirection: "column", children: [!customMode && (_jsxs(Text, { color: search ? theme.assistant : theme.muted, children: ["(", t('search_prompt'), " ", search, cursorVisible ? '█' : ' ', ")"] })), startIndex > 0 && _jsxs(Text, { color: theme.modalDim, children: ["  ", t('hidden_above'), " (", startIndex, ")..."] }), visibleItems.map((item, i) => {
+    return (_jsxs(Box, { flexDirection: "column", children: [!customMode && (_jsxs(Text, { color: search ? theme.assistant : theme.muted, children: ["(", t('search_prompt'), " ", search, caretVisible ? '█' : ' ', ")"] })), startIndex > 0 && _jsxs(Text, { color: theme.modalDim, children: ["  ", t('hidden_above'), " (", startIndex, ")..."] }), visibleItems.map((item, i) => {
                 if (item.type === 'custom') {
-                    return (_jsxs(Text, { color: customMode || selectedIndex === 0 ? theme.modalTitle : theme.muted, bold: customMode || selectedIndex === 0, children: [customMode || selectedIndex === 0 ? '  ❯ ' : '    ', t('enter_model'), " ", customMode ? `${customInput}${cursorVisible ? '█' : ' '}` : ''] }, "custom"));
+                    return (_jsxs(Text, { color: customMode || selectedIndex === 0 ? theme.modalTitle : theme.muted, bold: customMode || selectedIndex === 0, children: [customMode || selectedIndex === 0 ? '  ❯ ' : '    ', t('enter_model'), " ", customMode ? `${customInput}${caretVisible ? '█' : ' '}` : ''] }, "custom"));
                 }
                 if (item.type === 'group') {
                     return (_jsxs(Box, { flexDirection: "column", children: [i > 0 && _jsx(Text, { children: " " }), _jsxs(Text, { color: theme.modalDim, children: ['  ', item.icon, " ", _jsx(Text, { color: theme.assistant, bold: true, children: item.label })] })] }, `g-${item.label}`));

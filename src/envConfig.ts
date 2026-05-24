@@ -21,6 +21,10 @@ export function isPlaceholderApiKey(key: string | undefined): boolean {
   );
 }
 
+export function isLocalApiBaseUrl(baseUrl: string | undefined): boolean {
+  return Boolean(baseUrl && /localhost|127\.0\.0\.1/i.test(baseUrl));
+}
+
 export function hasConfiguredApi(): boolean {
   const provider = (process.env.LLM_PROVIDER || 'openai').toLowerCase();
 
@@ -34,7 +38,7 @@ export function hasConfiguredApi(): boolean {
 
   const baseUrl = process.env.OPENAI_BASE_URL || process.env.OMNIROUTE_BASE_URL || '';
 
-  if (baseUrl && /localhost|127\.0\.0\.1/i.test(baseUrl)) {
+  if (isLocalApiBaseUrl(baseUrl)) {
     return true;
   }
 

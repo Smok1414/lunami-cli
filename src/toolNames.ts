@@ -9,7 +9,12 @@ export const BUILTIN_TOOL_NAMES = [
   'search',
   'gitStatus',
   'gitDiff',
-  'gitCommit'
+  'gitCommit',
+  'file.read',
+  'file.write',
+  'system.exec',
+  'patchFile',
+  'file.patch'
 ] as const;
 
 export type BuiltinToolName = (typeof BUILTIN_TOOL_NAMES)[number];

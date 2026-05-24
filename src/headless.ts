@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { runAgent, type AgentEvent } from './agent.js';
 import { getMcpManager } from './mcp/manager.js';
-import { clearMemory, loadMemory, saveMemory, type MemoryState } from './memory.js';
+import { LongMemory, type MemoryState } from './core/memory/long.memory.js';
 import { changeCwd, getAgentMode, setAgentMode, shouldSkipWriteApproval, type AgentMode } from './state.js';
-import { changeModel } from './llm.js';
+import { changeModel, preflightConfiguredApi } from './llm.js';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.js';
 import { t } from './i18n.js';
 import { resolveMentions } from './mentions.js';
@@ -37,6 +37,14 @@ export interface HeadlessResult {
   durationMs: number;
   rounds: number;
   error?: string;
+}
+
+function emitJsonResult(enabled: boolean | undefined, result: HeadlessResult): HeadlessResult {
+  if (enabled) {
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  }
+
+  return result;
 }
 
 interface ToolCallRecord {
@@ -334,6 +342,11 @@ export async function runHeadless(opts: HeadlessOptions): Promise<HeadlessResult
     await changeModel(opts.model);
   }
 
+  const apiPreflight = await preflightConfiguredApi();
+  if (!apiPreflight.ok) {
+    return emitJsonResult(opts.json, reporter.failure(apiPreflight.error || t('headless_err_api', 'Connection error.'), 4));
+  }
+
   reporter.info(`cwd: ${cwd}`);
   reporter.info(`mode: ${requestedMode}`);
   if (opts.dryRun) {
@@ -344,9 +357,10 @@ export async function runHeadless(opts: HeadlessOptions): Promise<HeadlessResult
   let history: ChatCompletionMessageParam[] = [];
   const sessionName = opts.sessionId;
   let activeMem: MemoryState | undefined;
+  const longMemory = new LongMemory();
 
   if (sessionName) {
-    activeMem = await loadMemory(opts.model ?? 'sonnet-4.5', sessionName);
+    activeMem = await longMemory.loadMemory(opts.model ?? 'sonnet-4.5', sessionName);
     if (activeMem && activeMem.history) {
       history = activeMem.history;
       reporter.info(`loaded session: ${sessionName} (${history.length} messages)`);
@@ -370,6 +384,7 @@ export async function runHeadless(opts: HeadlessOptions): Promise<HeadlessResult
         history,
         sessionName: sessionName ?? 'headless-session',
         mode: requestedMode,
+        maxRounds: opts.maxRounds,
         skipWriteApproval: shouldSkipWriteApproval(requestedMode) || isAutoApproveWrites(opts.yes ?? false),
         onEvent: (event) => reporter.handleEvent(event)
       }),
@@ -381,7 +396,7 @@ export async function runHeadless(opts: HeadlessOptions): Promise<HeadlessResult
     // Save if session provided
     if (sessionName && activeMem) {
       activeMem.history = nextHistory;
-      await saveMemory(activeMem);
+      await longMemory.saveMemory(activeMem);
     }
 
     if (reporter.hasError) {
@@ -389,35 +404,28 @@ export async function runHeadless(opts: HeadlessOptions): Promise<HeadlessResult
       if (reporter.lastErrorMessage === t('agent_max_rounds')) exitCode = 3;
       
       const finalResult = reporter.failure(reporter.lastErrorMessage, exitCode, true);
-      if (opts.json) process.stdout.write(JSON.stringify(finalResult, null, 2) + "\n");
-      return finalResult;
+      return emitJsonResult(opts.json, finalResult);
     }
 
     const finalResult = reporter.success(t('headless_done'));
-
-    if (opts.json) {
-      process.stdout.write(JSON.stringify(finalResult, null, 2) + "\n");
-    }
-
-    return finalResult;
+    return emitJsonResult(opts.json, finalResult);
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
 
     if (interrupted || msg === t('headless_interrupted')) {
       const finalResult = reporter.cancelled();
-      if (opts.json) process.stdout.write(JSON.stringify(finalResult, null, 2) + "\n");
-      return finalResult;
+      return emitJsonResult(opts.json, finalResult);
     }
 
     if (msg === t('agent_max_rounds') || msg.includes("too many tool rounds")) {
-      return reporter.failure(t('headless_err_rounds'), 3);
+      return emitJsonResult(opts.json, reporter.failure(t('headless_err_rounds'), 3));
     }
     if (msg.includes("API") || msg.includes("rate limit") || msg.includes("timeout")) {
-      return reporter.failure(`${t('headless_err_prefix')} API: ${msg}`, 4);
+      return emitJsonResult(opts.json, reporter.failure(`${t('headless_err_prefix')} API: ${msg}`, 4));
     }
 
-    return reporter.failure(msg, 1);
+    return emitJsonResult(opts.json, reporter.failure(msg, 1));
   } finally {
     if (useRawInput) {
       process.stdin.off('keypress', handleKeypress);

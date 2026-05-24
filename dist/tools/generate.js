@@ -159,7 +159,7 @@ function createNodeTemplate(name) {
                 type: 'module',
                 scripts: {
                     dev: 'tsx src/index.ts',
-                    build: 'tsc --noEmit',
+                    build: 'tsc',
                     start: 'node dist/index.js'
                 },
                 dependencies: {},

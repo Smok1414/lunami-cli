@@ -1,5 +1,6 @@
 import type {LLMMessage, LLMProvider, LLMResponse, LLMTool, LlmToolCall} from '../llm.js';
 import { isAcceptedToolName } from '../toolNames.js';
+import {sanitizeChatCompletionMessages, sanitizeLlmTools} from './requestSanitizer.js';
 
 type OllamaProviderOptions = {
   model: string;
@@ -23,6 +24,8 @@ export class OllamaProvider implements LLMProvider {
   }
 
   async chat(messages: LLMMessage[], tools: LLMTool[] = []): Promise<LLMResponse> {
+    const requestTools = sanitizeLlmTools(tools);
+
     const response = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: {
@@ -30,8 +33,8 @@ export class OllamaProvider implements LLMProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        messages: toOllamaMessages(messages),
-        tools: tools.length > 0 ? toOllamaTools(tools) : undefined,
+        messages: toOllamaMessages(sanitizeChatCompletionMessages(messages)),
+        tools: requestTools.length > 0 ? toOllamaTools(requestTools) : undefined,
         stream: false
       })
     });
@@ -184,4 +187,3 @@ function parseArguments(value: Record<string, unknown> | string | undefined): Re
 
   return value;
 }
-

@@ -32,7 +32,7 @@ export function parseArgs(argv) {
                 result.help = true;
                 break;
             case '--version':
-            case '-v':
+            case '-V':
                 result.version = true;
                 break;
             case '--plan':
@@ -58,6 +58,7 @@ export function parseArgs(argv) {
                 result.noColor = true;
                 break;
             case '--verbose':
+            case '-v':
                 result.verbose = true;
                 break;
             case '--debug':
