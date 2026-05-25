@@ -1,12 +1,20 @@
 # LUNAMI CLI
 
 [![CI](https://github.com/Smok1414/lunami-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Smok1414/lunami-cli/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/lunami-cli.svg)](https://www.npmjs.com/package/lunami-cli)
 
 **LUNAMI** is an agentic terminal UI for AI pair programming: read and write files, search the codebase, git, project scaffolding, MCP tools, and a headless mode for scripts and CI.
 
+<!--
+  Demo GIF placeholder. Drop a recording at docs/demo.gif (or similar) and the
+  image below will render once committed. Recommended capture: 80x24 terminal,
+  10–15s clip showing `lunami init` → ask a question → tool call → answer.
+-->
+![LUNAMI demo](docs/demo.gif)
+
 > **About this project**  
 > Built by [**Smok1414**](https://github.com/Smok1414) — a 14-year-old developer — with help from AI. A coding agent in your terminal, like a teammate while you build.  
-> Early release (`v0.1.0`). Issues and PRs welcome on [GitHub](https://github.com/Smok1414/lunami-cli).
+> Issues and PRs welcome on [GitHub](https://github.com/Smok1414/lunami-cli).
 
 ## Features
 
@@ -21,17 +29,31 @@
 - **Headless**: `--prompt`, stdin, `--json`, `--plan`, `--yolo`, `-y`
 - **i18n**: Russian and English UI (`/lang ru` | `/lang en`)
 
-## Roadmap: run a model through LUNAMI
+## 30-second setup
 
-Today you can already point LUNAMI at a **local model via [Ollama](https://ollama.com)** (see below).
+```bash
+npm install -g lunami-cli
+lunami init      # interactive wizard: provider → key → model → language
+lunami           # start the TUI
+```
 
-What I want next:
+The wizard writes `~/.lunami/.env` so every workspace inherits the same config.
 
-- **`lunami models pull <name>`** — download a model in one command
-- **`lunami run`** — start the agent with a bundled or local model, no cloud API key
-- A simple setup wizard in the TUI: pick provider → pick model → go
+To use a local model with no cloud key:
 
-If you know Ollama, LM Studio, or llama.cpp — ideas and PRs for a smooth “download & run” flow are very welcome.
+```bash
+lunami init                       # pick "ollama" when asked
+lunami models pull llama3.2       # downloads via the Ollama backend
+lunami                            # ready
+```
+
+## Roadmap
+
+- **`lunami run`** — start the agent against a bundled local model, no setup at all
+- LM Studio / llama.cpp backends for `models pull`
+- Web/server mode for remote use
+
+Ideas and PRs welcome.
 
 ## One-line install
 
@@ -96,10 +118,11 @@ lunami
 
 `npm run link:global` = `npm run build` + `npm link` (registers the `lunami` command on your PATH).
 
-**When published on npm:**
+**From npm (recommended for users):**
 
 ```bash
 npm install -g lunami-cli
+lunami init
 lunami
 ```
 

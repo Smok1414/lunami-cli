@@ -26,6 +26,8 @@ ${bold('LUNAMI')} - agentic TUI for pair-programming with AI
 
 ${cyan('Usage:')}
   lunami                          start interactive TUI
+  lunami ${green('init')}                         interactive setup wizard
+  lunami ${green('models pull')} ${gray('llama3.2')}        download a model (Ollama)
   lunami ${green('--prompt')} ${gray('"task"')}              headless mode, no TUI
   lunami ${green('--run')} ${gray('task.md')}                  run task from file
   lunami ${green('--update')}                     update CLI to latest
@@ -68,6 +70,8 @@ ${bold('LUNAMI')} — agentic TUI для парного программиров
 
 ${cyan('Использование:')}
   lunami                          запустить интерактивный TUI
+  lunami ${green('init')}                       мастер первичной настройки
+  lunami ${green('models pull')} ${gray('llama3.2')}        скачать модель (Ollama)
   lunami ${green('--prompt')} ${gray('"задача"')}           headless-режим, без TUI
   lunami ${green('--run')} ${gray('task.md')}               выполнить задачу из файла
   lunami ${green('--update')}                  обновить CLI до latest
@@ -117,7 +121,50 @@ function printVersion() {
   }
 }
 
+async function handleSubcommand(): Promise<number | null> {
+  // Inspect raw positional args BEFORE parseArgs so `lunami init` / `lunami models pull X`
+  // can dispatch without polluting the flag parser. `update` is already handled inline below.
+  const positional = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+
+  if (positional[0] === 'init') {
+    const { InitCommand } = await import('./commands/init.command.js');
+    return new InitCommand().run();
+  }
+
+  if (positional[0] === 'models' && positional[1] === 'pull') {
+    const modelName = positional[2];
+    const { ModelCommand } = await import('./commands/model.command.js');
+    const cmd = new ModelCommand();
+
+    if (!modelName) {
+      process.stderr.write('usage: lunami models pull <model-name>\n');
+      return 2;
+    }
+
+    process.stdout.write(`Pulling "${modelName}"...\n`);
+    const result = await cmd.pull(modelName, (chunk) => {
+      const stream = chunk.type === 'error' ? process.stderr : process.stdout;
+      stream.write(chunk.text);
+    });
+
+    if (result.message) {
+      const stream = result.ok ? process.stdout : process.stderr;
+      stream.write(`${result.message}\n`);
+    } else if (result.ok) {
+      process.stdout.write(`✓ ${result.provider}: ${result.model}\n`);
+    }
+    return result.exitCode;
+  }
+
+  return null;
+}
+
 async function main() {
+  const subcommandExit = await handleSubcommand();
+  if (subcommandExit !== null) {
+    process.exit(subcommandExit);
+  }
+
   let args;
 
   try {

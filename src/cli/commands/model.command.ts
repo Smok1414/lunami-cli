@@ -1,6 +1,6 @@
 // File: src/cli/commands/model.command.ts
 
-import { ModelService } from '../../app/model/model.service.js';
+import { ModelService, type PullProgress, type PullResult } from '../../app/model/model.service.js';
 
 export class ModelCommand {
   private readonly modelService: ModelService;
@@ -19,5 +19,9 @@ export class ModelCommand {
 
   public async getModelGroups() {
     return this.modelService.getModelGroups();
+  }
+
+  public async pull(modelName: string, onProgress?: (chunk: PullProgress) => void): Promise<PullResult> {
+    return this.modelService.pull(modelName, onProgress);
   }
 }
