@@ -45,7 +45,6 @@
 
     "link:global": "npm run build && npm link",
 
-    "prepare": "npm run build",
 
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
 
