@@ -1,70 +1,212 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, useStdout, useInput } from 'ink';
 import { checkForUpdates, getCliMetadata } from '../../update.js';
 import { t } from '../../i18n.js';
-const MOON_ART = [
-    '       _..._       ',
-    '     .::\'   `.     ',
-    '    :::       :    ',
-    '    :::       :    ',
-    '    `::.     .\'    ',
-    '      `\'... \'      ',
-    '                   ',
-    '   L U N A M I     '
+import { prefersAsciiOutput } from '../../utils/terminal.js';
+export const splashBackgroundColor = '#0d1f18';
+const GREEN = '#3fffa8';
+const GREEN_SOFT = '#6dffc4';
+const GREEN_MUTED = '#2a6e4b';
+const GREEN_GHOST = '#1a3d2c';
+const STAR_CHARS = ['.', '·', '*', '+', '·'];
+const NOISE_CHARS = ['pd', '—', '·', '···', '——'];
+const MOON_UNICODE = [
+    '         ▄████▄         ',
+    '       ▄██▀  ▀██▄       ',
+    '      ██▀      ▀██      ',
+    '     ██          ██     ',
+    '     ██          ██     ',
+    '     ██          ██     ',
+    '      ██▄      ▄██      ',
+    '       ▀██▄  ▄██▀       ',
+    '         ▀████▀         '
 ];
-function buildWindRow(columns, seed) {
-    let line = '';
-    for (let x = 0; x < columns + 40; x += 1) {
-        const rand = Math.sin(seed * 12.9898 + x * 78.233) * 43758.5453;
-        const value = rand - Math.floor(rand);
-        if (value > 0.98)
-            line += '~';
-        else if (value > 0.96)
-            line += '-';
-        else if (value > 0.94)
-            line += '·';
-        else
-            line += ' ';
+const MOON_ASCII = [
+    '       .========.       ',
+    '     .==        ==.     ',
+    '    ==            ==    ',
+    '   =                =   ',
+    '   =                =   ',
+    '   =                =   ',
+    '    ==            ==    ',
+    '     .==        ==.     ',
+    '       .========.       '
+];
+function generateStars(count, columns, rows) {
+    const safeRows = Math.max(8, rows - 3);
+    const safeCols = Math.max(20, columns - 4);
+    return Array.from({ length: count }, (_, id) => ({
+        id,
+        x: 2 + Math.floor(Math.random() * safeCols),
+        y: 1 + Math.floor(Math.random() * safeRows),
+        opacity: Math.random() * 0.5 + 0.05,
+        duration: Math.random() * 4 + 2,
+        delay: Math.random() * 5,
+        char: STAR_CHARS[Math.floor(Math.random() * STAR_CHARS.length)]
+    }));
+}
+function generateParticles(count, columns, rows) {
+    const safeRows = Math.max(8, rows - 3);
+    const safeCols = Math.max(20, columns - 6);
+    return Array.from({ length: count }, (_, id) => ({
+        id,
+        x: 2 + Math.floor(Math.random() * safeCols),
+        y: 1 + Math.floor(Math.random() * safeRows),
+        duration: Math.random() * 7 + 4,
+        delay: Math.random() * 7,
+        char: NOISE_CHARS[Math.floor(Math.random() * NOISE_CHARS.length)]
+    }));
+}
+function starColor(star, frame) {
+    const phase = ((frame / 10 + star.delay) / star.duration) * Math.PI * 2;
+    const wave = (Math.sin(phase) + 1) / 2;
+    const opacity = 0.03 + wave * star.opacity;
+    if (opacity < 0.12)
+        return GREEN_GHOST;
+    if (opacity < 0.28)
+        return GREEN_MUTED;
+    return GREEN;
+}
+function particleY(particle, frame, rows) {
+    const elapsed = (frame / 10 + particle.delay) % particle.duration;
+    const ratio = elapsed / particle.duration;
+    const drift = Math.floor(ratio * 8);
+    const y = particle.y - drift;
+    return ((y % rows) + rows) % rows;
+}
+function moonColor(frame) {
+    return (frame % 28) / 28 < 0.5 ? GREEN : GREEN_SOFT;
+}
+function moonArt(ascii) {
+    const lines = ascii ? MOON_ASCII : MOON_UNICODE;
+    const center = (lines.length - 1) / 2;
+    return lines.map((text, index) => {
+        const dist = Math.abs(index - center) / Math.max(center, 1);
+        let color = GREEN_MUTED;
+        if (dist < 0.35)
+            color = GREEN;
+        else if (dist < 0.75)
+            color = GREEN_SOFT;
+        return { text, color, bold: dist < 0.9, isMoon: true };
+    });
+}
+function brandLines(ascii) {
+    return [
+        ...moonArt(ascii),
+        { text: '', color: GREEN },
+        { text: 'L  U  N  A  M  I', color: GREEN },
+        { text: 'AI  TERMINAL  AGENT', color: GREEN_MUTED }
+    ];
+}
+function paintCell(grid, x, y, cell) {
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length)
+        return;
+    row[x] = cell;
+}
+function paintText(grid, x, y, line) {
+    for (let i = 0; i < line.text.length; i += 1) {
+        paintCell(grid, x + i, y, { char: line.text[i], color: line.color, bold: line.bold });
     }
-    return line;
+}
+function buildFrame(columns, rows, frame, stars, particles, brand, brandStartY, fadeOut) {
+    const grid = Array.from({ length: rows }, () => Array.from({ length: columns }, () => ({ char: ' ', color: GREEN_GHOST })));
+    for (const star of stars) {
+        paintCell(grid, star.x, star.y, {
+            char: star.char,
+            color: fadeOut ? GREEN_GHOST : starColor(star, frame)
+        });
+    }
+    for (const particle of particles) {
+        const y = particleY(particle, frame, rows - 1);
+        const text = particle.char;
+        for (let i = 0; i < text.length; i += 1) {
+            paintCell(grid, particle.x + i, y, { char: text[i], color: GREEN_GHOST });
+        }
+    }
+    const moonTint = fadeOut ? GREEN_GHOST : moonColor(frame);
+    for (let i = 0; i < brand.length; i += 1) {
+        const line = brand[i];
+        if (!line.text)
+            continue;
+        const x = Math.max(0, Math.floor((columns - line.text.length) / 2));
+        const y = brandStartY + i;
+        if (y < 0 || y >= rows)
+            continue;
+        const color = line.isMoon
+            ? fadeOut
+                ? GREEN_GHOST
+                : line.color === GREEN
+                    ? moonTint
+                    : line.color
+            : fadeOut
+                ? GREEN_GHOST
+                : line.color;
+        paintText(grid, x, y, { ...line, color });
+    }
+    return grid;
+}
+function rowToNodes(row, y) {
+    const nodes = [];
+    let run = '';
+    let runColor = row[0]?.color ?? GREEN_GHOST;
+    let runBold = row[0]?.bold ?? false;
+    const flush = () => {
+        if (!run)
+            return;
+        nodes.push(_jsx(Text, { color: runColor, bold: runBold, children: run }, `${y}-${nodes.length}`));
+        run = '';
+    };
+    for (const cell of row) {
+        if (cell.color === runColor && cell.bold === runBold) {
+            run += cell.char;
+        }
+        else {
+            flush();
+            run = cell.char;
+            runColor = cell.color;
+            runBold = cell.bold ?? false;
+        }
+    }
+    flush();
+    return (_jsx(Box, { children: nodes }, y));
 }
 export function WelcomeScreen({ onComplete }) {
     const { stdout } = useStdout();
-    const [dimensions, setDimensions] = useState({
-        columns: stdout.columns ?? 80,
-        rows: stdout.rows ?? 24
-    });
+    const [size, setSize] = useState({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
     const [frame, setFrame] = useState(0);
+    const [fadeOut, setFadeOut] = useState(false);
     const [updateHint, setUpdateHint] = useState(null);
+    const onCompleteRef = useRef(onComplete);
+    const fadingRef = useRef(false);
     const version = useMemo(() => getCliMetadata().version, []);
+    const ascii = prefersAsciiOutput();
+    const brand = useMemo(() => brandLines(ascii), [ascii]);
+    onCompleteRef.current = onComplete;
+    const dismiss = useCallback(() => {
+        if (fadingRef.current)
+            return;
+        fadingRef.current = true;
+        setFadeOut(true);
+        setTimeout(() => onCompleteRef.current(), 500);
+    }, []);
     useEffect(() => {
-        const handleResize = () => {
-            setDimensions({
-                columns: stdout.columns ?? 80,
-                rows: stdout.rows ?? 24
-            });
-        };
-        stdout.on('resize', handleResize);
+        const onResize = () => setSize({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
+        stdout.on('resize', onResize);
         return () => {
-            stdout.off('resize', handleResize);
+            stdout.off('resize', onResize);
         };
     }, [stdout]);
-    useInput(() => {
-        onComplete();
-    });
+    useInput(dismiss);
     useEffect(() => {
-        const timer = setInterval(() => {
-            setFrame((f) => f + 1);
-        }, 80);
-        const completeTimer = setTimeout(() => {
-            onComplete();
-        }, 5000);
-        return () => {
-            clearInterval(timer);
-            clearTimeout(completeTimer);
-        };
-    }, [onComplete]);
+        const timer = setInterval(() => setFrame((value) => value + 1), 100);
+        return () => clearInterval(timer);
+    }, []);
+    useEffect(() => {
+        const timer = setTimeout(dismiss, 8000);
+        return () => clearTimeout(timer);
+    }, [dismiss]);
     useEffect(() => {
         void checkForUpdates(1200).then((result) => {
             if (result?.updateAvailable) {
@@ -72,29 +214,17 @@ export function WelcomeScreen({ onComplete }) {
             }
         });
     }, []);
-    const columns = dimensions.columns;
-    const rows = dimensions.rows;
-    const offset = (frame * 2) % 120;
-    const moonWidth = MOON_ART[0].length;
-    const moonHeight = MOON_ART.length;
-    const startX = Math.max(0, Math.floor(columns / 2 - moonWidth / 2));
-    const startY = Math.max(0, Math.floor(rows / 2 - moonHeight / 2 - 2));
-    const footerStart = Math.max(0, rows - 3);
-    const displayLines = Array.from({ length: rows }).map((_, y) => {
-        if (y >= footerStart) {
-            return null;
-        }
-        const windRow = buildWindRow(columns, y + frame);
-        const line = windRow.slice(offset, offset + columns).padEnd(columns, ' ');
-        if (y >= startY && y < startY + moonHeight) {
-            const moonLine = MOON_ART[y - startY];
-            const leftWind = line.slice(0, startX);
-            const rightWind = line.slice(startX + moonWidth);
-            return (_jsxs(Box, { children: [_jsx(Text, { color: "#4a5568", children: leftWind }), _jsx(Text, { color: y === startY + moonHeight - 1 ? '#a3d9a5' : '#fefcd7', bold: true, children: moonLine }), _jsx(Text, { color: "#4a5568", children: rightWind })] }, y));
-        }
-        return (_jsx(Box, { children: _jsx(Text, { color: "#4a5568", children: line }) }, y));
-    });
-    return (_jsxs(Box, { flexDirection: "column", width: columns, height: rows, overflow: "hidden", children: [displayLines.filter((line) => line !== null), _jsx(Box, { flexGrow: 1 }), _jsx(Text, { color: "#8fa9c7", children: t('welcome_version', version) }), updateHint ? _jsx(Text, { color: "#a3d9a5", children: updateHint }) : null, _jsx(Text, { color: "#647181", children: t('welcome_skip') })] }));
+    const { columns, rows } = size;
+    const stars = useMemo(() => generateStars(55, columns, rows), [columns, rows]);
+    const particles = useMemo(() => generateParticles(24, columns, rows), [columns, rows]);
+    const footerRows = updateHint ? 2 : 1;
+    const canvasRows = Math.max(1, rows - footerRows);
+    const brandStartY = Math.max(0, Math.floor((canvasRows - brand.length) / 2));
+    const versionLabel = t('welcome_version', version);
+    const skipLabel = t('welcome_skip');
+    const showHint = Math.floor(frame / 7) % 2 === 0;
+    const grid = buildFrame(columns, canvasRows, frame, stars, particles, brand, brandStartY, fadeOut);
+    return (_jsxs(Box, { flexDirection: "column", width: columns, height: rows, children: [grid.map((row, y) => rowToNodes(row, y)), _jsxs(Box, { width: columns, flexDirection: "row", children: [_jsx(Text, { color: GREEN_MUTED, children: versionLabel }), _jsx(Box, { flexGrow: 1 }), showHint ? _jsx(Text, { color: GREEN_MUTED, children: skipLabel }) : _jsx(Text, { children: " " })] }), updateHint ? (_jsx(Text, { color: GREEN_MUTED, wrap: "truncate", children: updateHint })) : null] }));
 }
 export function shouldShowWelcome() {
     if (process.env.LUNAMI_SKIP_SPLASH === '1') {

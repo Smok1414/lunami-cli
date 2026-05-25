@@ -1,13 +1,21 @@
 // File: src/ui/renderer.ts
 import { render } from 'ink';
 import React from 'react';
-import { WelcomeScreen, shouldShowWelcome } from './components/welcomeScreen.js';
+import { WelcomeScreen, shouldShowWelcome, splashBackgroundColor } from './components/welcomeScreen.js';
 import { App } from './App.js';
-import { prefersAsciiOutput } from '../utils/terminal.js';
-const tuiBackground = '\x1b[48;2;16;39;43m';
+function hexToRgb(hex) {
+    const normalized = hex.replace('#', '');
+    return [
+        Number.parseInt(normalized.slice(0, 2), 16),
+        Number.parseInt(normalized.slice(2, 4), 16),
+        Number.parseInt(normalized.slice(4, 6), 16)
+    ];
+}
+const [bgR, bgG, bgB] = hexToRgb(splashBackgroundColor);
+const tuiBackground = `\x1b[48;2;${bgR};${bgG};${bgB}m`;
 const resetStyle = '\x1b[0m';
 export function renderTUI() {
-    if (process.stdout.isTTY && !prefersAsciiOutput()) {
+    if (process.stdout.isTTY) {
         if (process.env.NO_COLOR === undefined && process.env.LUNAMI_NO_COLOR !== '1') {
             process.stdout.write(tuiBackground);
             process.once('exit', () => {

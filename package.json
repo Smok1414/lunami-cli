@@ -13,13 +13,17 @@
   },
   "homepage": "https://github.com/Smok1414/lunami-cli#readme",
   "type": "module",
-  "main": "dist/index.js",
+
+  "main": "dist/cli/index.js",
+
   "bin": {
-    "lunami": "dist/index.js"
+    "lunami": "dist/cli/index.js"
   },
+
   "files": [
     "dist"
   ],
+
   "keywords": [
     "ai",
     "cli",
@@ -29,15 +33,25 @@
     "ink",
     "mcp"
   ],
+
   "scripts": {
-    "dev": "node --import tsx src/index.tsx",
+    "dev": "node --import tsx cli/index.ts",
+
     "typecheck": "tsc --noEmit",
+
     "build": "tsc",
+
+    "clean": "rmdir /s /q dist",
+
     "link:global": "npm run build && npm link",
-    "prepare": "node scripts/ensure-build.mjs",
+
+    "prepare": "npm run build",
+
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+
     "prepublishOnly": "npm run build"
   },
+
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -46,6 +60,7 @@
     "openai": "^4.104.0",
     "react": "^18.3.1"
   },
+
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",
@@ -56,6 +71,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
+
   "engines": {
     "node": ">=20"
   }
